@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Tickers Leaderboard</title>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:#080810;min-height:100vh;color:#fff;}
+  @keyframes floatUp{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-16px)}}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  input[type=number]{-moz-appearance:textfield;}
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+  input::placeholder{color:rgba(255,255,255,0.18);}
+  ::-webkit-scrollbar{width:3px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:rgba(167,139,250,0.2);border-radius:4px;}
+  .row-enter{animation:fadeIn 0.4s ease forwards;}
+  .panel-enter{animation:slideIn 0.35s cubic-bezier(0.16,1,0.3,1) forwards;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- ══════════════════════════════════════════════════════════
+     PASTE YOUR SUPABASE KEYS BELOW — nothing else to change
+     ══════════════════════════════════════════════════════════ -->
+<script>
+  const { createClient } = supabase;
+  const SUPA = createClient(
+    'https://pmnomozuqxpadxeyjlps.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtbm9tb3p1cXhwYWR4ZXlqbHBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMjE1OTIsImV4cCI6MjA4OTU5NzU5Mn0.GxzQxAJKLEs8zZ3O2Ps81EJDsJ_qpBkUwxHq3-uG2Tw'
+  );
+</script>
+
+<script type="text/babel">
+const { useState, useMemo, useEffect, useRef } = React;
+
+const MONO = "'SF Mono','Fira Code','Courier New',monospace";
+const SANS = "'SF Pro Display','-apple-system','BlinkMacSystemFont','Helvetica Neue','Inter',sans-serif";
+const G = "#34d399", R = "#fb7185";
+
+const fmt    = v => { const a=Math.abs(v),s=v>=0?"+":"-"; return a>=1000?`${s}$${(a/1e3).toFixed(1)}k`:`${s}$${a.toFixed(0)}`; };
+const fmtAvg = v => { const a=Math.abs(v),s=v>=0?"+":"-"; return a>=1000?`${s}$${(a/1e3).toFixed(1)}k`:`${s}$${a.toFixed(0)}`; };
+const pct    = v => `${v.toFixed(1)}%`;
+const computeStats = s => ({ ...s, winRate: s.trades>0?(s.wins/s.trades)*100:0, avgReturn: s.trades>0?s.pnl/s.trades:0 });
+
+/* upload a base64 dataUrl to Supabase storage, return public URL */
+const uploadImg = async (dataUrl, path) => {
+  const blob = await fetch(dataUrl).then(r => r.blob());
+  const { error } = await SUPA.storage.from('proofs').upload(path, blob, { contentType: blob.type, upsert: true });
+  if (error) throw error;
+  return SUPA.storage.from('proofs').getPublicUrl(path).data.publicUrl;
+};
+
+/* ── Avatar ─────────────────────────────────────────────── */
+const Avatar = ({ name, pic, size=36 }) => {
+  const hues=[258,280,240,310,265,250,295];
+  const h=hues[name.charCodeAt(0)%hues.length];
+  return pic
+    ? <img src={pic} style={{width:size,height:size,borderRadius:"50%",objectFit:"cover",flexShrink:0,boxShadow:`0 0 14px hsla(${h},80%,65%,0.45)`}}/>
+    : <div style={{width:size,height:size,borderRadius:"50%",flexShrink:0,background:`linear-gradient(135deg,hsl(${h},70%,72%),hsl(${h+30},80%,50%))`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*0.4,fontWeight:700,color:"#fff",fontFamily:SANS,boxShadow:`0 0 14px hsla(${h},80%,65%,0.5)`}}>{name[0].toUpperCase()}</div>;
+};
+
+/* ── Spinner ─────────────────────────────────────────────── */
+const Spin = () => <div style={{width:16,height:16,border:"2px solid rgba(196,181,253,0.2)",borderTop:"2px solid rgba(196,181,253,0.8)",borderRadius:"50%",animation:"spin 0.7s linear infinite",display:"inline-block"}}/>;
+
+/* ── Toast ───────────────────────────────────────────────── */
+function Toast({ msg, isError, onDone }) {
+  useEffect(() => { const t=setTimeout(onDone,3200); return ()=>clearTimeout(t); }, []);
+  const col = isError ? "rgba(251,113,133" : "rgba(52,211,153";
+  return (
+    <div style={{position:"fixed",bottom:32,left:"50%",transform:"translateX(-50%)",zIndex:9999,padding:"12px 22px",background:`${col},0.12)`,border:`1px solid ${col},0.3)`,borderRadius:99,fontFamily:MONO,fontSize:12,color:`${col},0.95)`,letterSpacing:"0.06em",boxShadow:`0 8px 32px rgba(0,0,0,0.4),0 0 30px ${col},0.15)`,animation:"fadeIn 0.3s ease",backdropFilter:"blur(20px)",whiteSpace:"nowrap"}}>
+      {isError?"✕":"✓"} &nbsp;{msg}
+    </div>
+  );
+}
+
+/* ── PrivacyBadge ────────────────────────────────────────── */
+function PrivacyBadge({ name }) {
+  const [tip,setTip]=useState(false);
+  return (
+    <div style={{position:"relative",display:"inline-flex",alignItems:"center"}} onMouseEnter={()=>setTip(true)} onMouseLeave={()=>setTip(false)}>
+      <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 11px",background:"rgba(167,139,250,0.06)",border:"1px solid rgba(167,139,250,0.2)",borderRadius:99,cursor:"default"}}>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+          <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94" stroke="rgba(196,181,253,0.75)" strokeWidth="2.2" strokeLinecap="round"/>
+          <path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19" stroke="rgba(196,181,253,0.75)" strokeWidth="2.2" strokeLinecap="round"/>
+          <line x1="1" y1="1" x2="23" y2="23" stroke="rgba(196,181,253,0.75)" strokeWidth="2.2" strokeLinecap="round"/>
+        </svg>
+        <span style={{fontFamily:MONO,fontSize:11,color:"rgba(196,181,253,0.55)",letterSpacing:"0.05em"}}>private</span>
+      </div>
+      {tip&&<div style={{position:"absolute",right:0,bottom:"calc(100% + 9px)",background:"#0f0f1a",border:"1px solid rgba(167,139,250,0.22)",borderRadius:10,padding:"9px 13px",whiteSpace:"nowrap",zIndex:99,boxShadow:"0 8px 32px rgba(0,0,0,0.6)"}}>
+        <div style={{fontSize:12,fontFamily:SANS,fontWeight:600,color:"rgba(196,181,253,0.9)",marginBottom:3}}>🔒 Privacy mode on</div>
+        <div style={{fontSize:11,fontFamily:SANS,color:"rgba(255,255,255,0.35)"}}>{name}'s P&L is kept private</div>
+      </div>}
+    </div>
+  );
+}
+
+/* ── StatCard ────────────────────────────────────────────── */
+function StatCard({ label, val, color, glow }) {
+  const [hov,setHov]=useState(false);
+  return (
+    <div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)} style={{background:hov?"rgba(255,255,255,0.05)":"rgba(255,255,255,0.025)",border:`1px solid ${hov?(glow?glow+"66":"rgba(167,139,250,0.35)"):"rgba(255,255,255,0.07)"}`,borderRadius:18,padding:"22px 24px",position:"relative",overflow:"hidden",backdropFilter:"blur(10px)",cursor:"default",boxShadow:hov?`0 0 40px ${glow||"rgba(167,139,250,"}${glow?"33":"0.12)"},0 8px 32px rgba(0,0,0,0.3)`:"0 2px 12px rgba(0,0,0,0.2)",transform:hov?"translateY(-3px) scale(1.02)":"translateY(0) scale(1)",transition:"all 0.25s cubic-bezier(0.34,1.56,0.64,1)"}}>
+      <div style={{position:"absolute",top:-50,right:-50,width:120,height:120,borderRadius:"50%",background:glow?`${glow}22`:"rgba(167,139,250,0.08)",filter:"blur(30px)",opacity:hov?1:0.3,transition:"opacity 0.3s"}}/>
+      <div style={{fontSize:9,fontFamily:MONO,color:"rgba(255,255,255,0.3)",marginBottom:10,letterSpacing:"0.12em",position:"relative"}}>{label}</div>
+      <div style={{fontSize:30,fontWeight:700,fontFamily:MONO,position:"relative",color:color||(hov?"#fff":"rgba(255,255,255,0.88)"),textShadow:hov?`0 0 24px ${glow||"rgba(167,139,250,0.9)"}`:glow?`0 0 14px ${glow}55`:"none",transition:"all 0.25s"}}>{val}</div>
+    </div>
+  );
+}
+
+/* ── TraderRow ───────────────────────────────────────────── */
+function TraderRow({ t, prev, isSelected, onClick, isLast, isNew }) {
+  const [hov,setHov]=useState(false);
+  const [rankAnim,setRankAnim]=useState(false);
+  useEffect(()=>{ if(prev&&prev.rank!==t.rank){setRankAnim(true);setTimeout(()=>setRankAnim(false),1400);} },[t.rank]);
+  const ri = r => r===1?"🏆":r===2?"🥈":r===3?"🥉":null;
+  const rankDiff = prev ? prev.rank-t.rank : 0;
+  return (
+    <div className={isNew?"row-enter":""}>
+      <div onClick={onClick} onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+        style={{display:"grid",gridTemplateColumns:"52px 1fr 140px 110px 80px 130px",padding:"15px 24px",cursor:"pointer",borderBottom:isLast?"none":"1px solid rgba(255,255,255,0.04)",background:isSelected?"rgba(167,139,250,0.06)":hov?"rgba(255,255,255,0.025)":"transparent",transition:"background 0.2s",position:"relative"}}>
+        {hov&&<>
+          <div style={{position:"absolute",left:0,right:0,top:0,height:"1px",background:"linear-gradient(90deg,transparent,rgba(167,139,250,0.5),rgba(99,179,237,0.3),transparent)"}}/>
+          <div style={{position:"absolute",left:0,right:0,bottom:0,height:"1px",background:"linear-gradient(90deg,transparent,rgba(167,139,250,0.15),transparent)"}}/>
+        </>}
+        {t.rank===1&&<div style={{position:"absolute",left:0,top:"15%",bottom:"15%",width:2,borderRadius:2,background:"rgba(167,139,250,0.8)",boxShadow:"0 0 8px rgba(167,139,250,0.7)"}}/>}
+        <div style={{display:"flex",alignItems:"center",gap:4}}>
+          {ri(t.rank)?<span style={{fontSize:20}}>{ri(t.rank)}</span>:<span style={{fontFamily:MONO,fontSize:12,color:rankAnim?"rgba(167,139,250,0.9)":"rgba(255,255,255,0.25)",textShadow:rankAnim?"0 0 12px rgba(167,139,250,0.8)":"none",transition:"all 0.4s",fontWeight:500}}>{t.rank}</span>}
+          {rankDiff>0&&<span style={{fontSize:9,color:G,fontFamily:MONO,animation:"floatUp 1.4s ease forwards"}}>▲{rankDiff}</span>}
+          {rankDiff<0&&<span style={{fontSize:9,color:R,fontFamily:MONO}}>▼{Math.abs(rankDiff)}</span>}
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <Avatar name={t.name} pic={t.pic}/>
+          <span style={{fontSize:15,fontWeight:700,fontFamily:SANS,color:hov?"#fff":"rgba(255,255,255,0.92)",textShadow:hov?"0 0 18px rgba(167,139,250,0.5)":"none",transition:"all 0.2s",letterSpacing:"-0.02em"}}>{t.name}</span>
+        </div>
+        <div style={{textAlign:"right",display:"flex",alignItems:"center",justifyContent:"flex-end"}}>
+          {t.hidePnl?<PrivacyBadge name={t.name}/>:<span style={{fontFamily:MONO,fontSize:15,fontWeight:700,color:t.pnl>=0?G:R,textShadow:`0 0 ${hov?22:10}px ${t.pnl>=0?G:R}${hov?"cc":"55"}`,transition:"text-shadow 0.2s"}}>{fmt(t.pnl)}</span>}
+        </div>
+        <div style={{textAlign:"right",display:"flex",alignItems:"center",justifyContent:"flex-end"}}>
+          <span style={{fontFamily:MONO,fontSize:13,fontWeight:600,color:t.winRate>=60?"#86efac":t.winRate>=40?"#fde68a":R,textShadow:`0 0 ${hov?14:6}px ${t.winRate>=60?"#86efac":t.winRate>=40?"#fde68a":R}88`,transition:"text-shadow 0.2s"}}>{pct(t.winRate)}</span>
+        </div>
+        <div style={{textAlign:"right",display:"flex",alignItems:"center",justifyContent:"flex-end"}}>
+          <span style={{fontFamily:MONO,fontSize:13,color:"rgba(255,255,255,0.4)",fontWeight:500}}>{t.trades}</span>
+        </div>
+        <div style={{textAlign:"right",display:"flex",alignItems:"center",justifyContent:"flex-end"}}>
+          {t.hidePnl?<span style={{fontFamily:MONO,fontSize:13,color:"rgba(167,139,250,0.25)"}}>——</span>:<span style={{fontFamily:MONO,fontSize:13,fontWeight:600,color:t.avgReturn>=0?"rgba(134,239,172,0.9)":"rgba(251,113,133,0.9)"}}>{fmtAvg(t.avgReturn)}</span>}
+        </div>
+      </div>
+      {isSelected&&(
+        <div style={{borderTop:"1px solid rgba(167,139,250,0.1)",background:"rgba(167,139,250,0.03)",padding:"18px 24px 22px",animation:"fadeIn 0.25s ease"}}>
+          <div style={{fontSize:9,fontFamily:MONO,letterSpacing:"0.12em",color:"rgba(255,255,255,0.2)",marginBottom:14}}>BREAKDOWN — {t.name.toUpperCase()}</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:9}}>
+            {[
+              {l:"P&L",        v:t.hidePnl?"private":fmt(t.pnl),      c:t.hidePnl?"rgba(167,139,250,0.4)":t.pnl>=0?G:R},
+              {l:"WIN RATE",   v:pct(t.winRate),                       c:t.winRate>=60?"#86efac":t.winRate>=40?"#fde68a":R},
+              {l:"TRADES",     v:t.trades,                             c:"rgba(255,255,255,0.75)"},
+              {l:"WINS",       v:t.wins,                               c:G},
+              {l:"LOSSES",     v:t.trades-t.wins,                     c:R},
+              {l:"AVG RETURN", v:t.hidePnl?"private":fmt(t.avgReturn), c:t.hidePnl?"rgba(167,139,250,0.4)":t.avgReturn>=0?G:R},
+            ].map(c=>(
+              <div key={c.l} style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,padding:"11px 13px"}}>
+                <div style={{fontSize:9,fontFamily:MONO,letterSpacing:"0.1em",color:"rgba(255,255,255,0.3)",marginBottom:6}}>{c.l}</div>
+                <div style={{fontFamily:MONO,fontSize:17,fontWeight:700,color:c.c,textShadow:`0 0 12px ${c.c}55`}}>{c.v}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── InputField ──────────────────────────────────────────── */
+function InputField({ label, value, onChange, placeholder, type="text", onEnter }) {
+  const [focused,setFocused]=useState(false);
+  return (
+    <div style={{marginBottom:14}}>
+      <div style={{fontSize:10,fontFamily:MONO,color:focused?"rgba(196,181,253,0.6)":"rgba(255,255,255,0.28)",marginBottom:7,letterSpacing:"0.11em",transition:"color 0.2s"}}>{label}</div>
+      <input type={type} value={value} onChange={e=>onChange(e.target.value)} onKeyDown={e=>e.key==="Enter"&&onEnter&&onEnter()} placeholder={placeholder}
+        style={{width:"100%",padding:"13px 16px",background:focused?"rgba(167,139,250,0.04)":"rgba(255,255,255,0.04)",border:`1px solid ${focused?"rgba(167,139,250,0.45)":"rgba(255,255,255,0.09)"}`,borderRadius:12,color:"#fff",fontSize:15,fontFamily:SANS,outline:"none",letterSpacing:"-0.01em",fontWeight:400,transition:"all 0.2s"}}
+        onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)}/>
+    </div>
+  );
+}
+
+/* ── LoginScreen ─────────────────────────────────────────── */
+function LoginScreen({ onLogin }) {
+  const [mode,setMode]         = useState("choose");
+  const [username,setUsername] = useState("");
+  const [email,setEmail]       = useState("");
+  const [password,setPassword] = useState("");
+  const [confirm,setConfirm]   = useState("");
+  const [preview,setPreview]   = useState(null);
+  const [err,setErr]           = useState("");
+  const [loading,setLoading]   = useState(false);
+  const fileRef = useRef();
+
+  const handlePic = e => { const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=ev=>setPreview(ev.target.result); r.readAsDataURL(f); };
+  const reset = m => { setMode(m);setErr("");setUsername("");setEmail("");setPassword("");setConfirm("");setPreview(null); };
+
+  const doRegister = async () => {
+    setErr("");
+    if(!preview)               return setErr("Profile picture is required.");
+    if(!username.trim())       return setErr("Username is required.");
+    if(username.trim().length<3) return setErr("Username must be at least 3 characters.");
+    if(!/\S+@\S+\.\S+/.test(email)) return setErr("Enter a valid email address.");
+    if(password.length<6)      return setErr("Password must be at least 6 characters.");
+    if(password!==confirm)     return setErr("Passwords don't match.");
+    setLoading(true);
+    try {
+      const { data:ex } = await SUPA.from('profiles').select('id').eq('username',username.trim().toLowerCase()).maybeSingle();
+      if(ex) { setLoading(false); return setErr("Username already taken."); }
+      const { data:auth,error:authErr } = await SUPA.auth.signUp({ email, password });
+      if(authErr) { setLoading(false); return setErr(authErr.message); }
+      const uid = auth.user.id;
+      const avatarUrl = await uploadImg(preview, `avatars/${uid}.jpg`);
+      await SUPA.from('profiles').insert({ id:uid, username:username.trim().toLowerCase(), display_name:username.trim(), avatar_url:avatarUrl, email });
+      await SUPA.from('traders').insert({ id:uid, username:username.trim().toLowerCase(), display_name:username.trim(), avatar_url:avatarUrl, pnl:0, trades:0, wins:0, hide_pnl:false });
+      onLogin({ name:username.trim(), pic:avatarUrl, id:uid, email });
+    } catch(e) { setLoading(false); setErr(e.message||"Something went wrong."); }
+  };
+
+  const doLogin = async () => {
+    setErr("");
+    if(!email.trim()) return setErr("Enter your email.");
+    if(!password)     return setErr("Enter your password.");
+    setLoading(true);
+    try {
+      const { data:auth,error } = await SUPA.auth.signInWithPassword({ email, password });
+      if(error) { setLoading(false); return setErr("Incorrect email or password."); }
+      const { data:profile } = await SUPA.from('profiles').select('*').eq('id',auth.user.id).single();
+      if(!profile) { setLoading(false); return setErr("Profile not found. Please register."); }
+      onLogin({ name:profile.display_name, pic:profile.avatar_url, id:auth.user.id, email });
+    } catch(e) { setLoading(false); setErr(e.message||"Something went wrong."); }
+  };
+
+  const BG = <>
+    <div style={{position:"absolute",top:"-15%",left:"-10%",width:"50vw",height:"50vw",borderRadius:"50%",background:"radial-gradient(circle,rgba(167,139,250,0.12),transparent 65%)",pointerEvents:"none"}}/>
+    <div style={{position:"absolute",bottom:"-10%",right:"-5%",width:"40vw",height:"40vw",borderRadius:"50%",background:"radial-gradient(circle,rgba(99,179,237,0.08),transparent 65%)",pointerEvents:"none"}}/>
+  </>;
+  const card = {position:"relative",width:420,maxWidth:"93vw",background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:24,padding:"2.25rem",backdropFilter:"blur(20px)",boxShadow:"0 0 80px rgba(167,139,250,0.1),0 32px 64px rgba(0,0,0,0.5)",animation:"fadeIn 0.35s ease"};
+  const Logo = () => (
+    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:"2rem"}}>
+      <div style={{width:34,height:34,borderRadius:9,background:"rgba(167,139,250,0.1)",border:"1px solid rgba(167,139,250,0.22)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 0 18px rgba(167,139,250,0.2)"}}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><polygon points="12,2 22,20 2,20" fill="none" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinejoin="round"/><polygon points="12,7 18,20 6,20" fill="rgba(196,181,253,0.18)" strokeLinejoin="round"/></svg>
+      </div>
+      <span style={{fontWeight:700,fontSize:13,letterSpacing:"0.13em",color:"rgba(255,255,255,0.9)",fontFamily:MONO,textShadow:"0 0 16px rgba(196,181,253,0.4)"}}>TICKERS</span>
+    </div>
+  );
+  const PBtn = ({ onClick, disabled, children }) => (
+    <button onClick={onClick} disabled={disabled} style={{width:"100%",padding:"14px",marginTop:4,display:"flex",alignItems:"center",justifyContent:"center",gap:8,background:"rgba(167,139,250,0.12)",border:"1px solid rgba(167,139,250,0.28)",borderRadius:13,color:"rgba(196,181,253,0.95)",fontSize:13,fontFamily:MONO,fontWeight:700,letterSpacing:"0.08em",cursor:"pointer",boxShadow:"0 0 24px rgba(167,139,250,0.12)",transition:"all 0.2s",opacity:disabled?0.6:1}}
+      onMouseEnter={e=>{if(!disabled){e.currentTarget.style.background="rgba(167,139,250,0.2)";e.currentTarget.style.boxShadow="0 0 32px rgba(167,139,250,0.25)";}}}
+      onMouseLeave={e=>{e.currentTarget.style.background="rgba(167,139,250,0.12)";e.currentTarget.style.boxShadow="0 0 24px rgba(167,139,250,0.12)";}}>
+      {children}
+    </button>
+  );
+  const ErrBox = ({ msg }) => msg ? <div style={{marginBottom:14,padding:"10px 14px",background:"rgba(251,113,133,0.07)",border:"1px solid rgba(251,113,133,0.18)",borderRadius:10,color:"rgba(251,113,133,0.9)",fontSize:12,fontFamily:MONO}}>{msg}</div> : null;
+  const BackBtn = ({ onClick }) => (
+    <button onClick={onClick} style={{position:"absolute",top:24,right:24,background:"none",border:"none",color:"rgba(255,255,255,0.3)",cursor:"pointer",fontSize:13,fontFamily:MONO,letterSpacing:"0.06em",padding:"4px 8px",borderRadius:8,transition:"color 0.2s"}}
+      onMouseEnter={e=>e.currentTarget.style.color="rgba(255,255,255,0.7)"} onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.3)"}>← BACK</button>
+  );
+
+  const wrap = (children) => (
+    <div style={{position:"fixed",inset:0,background:"#080810",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300,fontFamily:SANS,overflowY:"auto"}}>
+      {BG}<div style={{...card,margin:"24px auto"}}>{children}</div>
+    </div>
+  );
+
+  if(mode==="choose") return (
+    <div style={{position:"fixed",inset:0,background:"#080810",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300,fontFamily:SANS}}>
+      {BG}
+      <div style={card}>
+        <Logo/>
+        <div style={{fontSize:30,fontWeight:700,color:"#fff",marginBottom:5,letterSpacing:"-0.03em"}}>Welcome to Tickers</div>
+        <div style={{fontSize:14,color:"rgba(255,255,255,0.32)",marginBottom:"2.25rem",lineHeight:1.6}}>The leaderboard for serious day traders.</div>
+        <button onClick={()=>reset("register")} style={{width:"100%",padding:"14px",marginBottom:10,background:"rgba(167,139,250,0.12)",border:"1px solid rgba(167,139,250,0.28)",borderRadius:13,color:"rgba(196,181,253,0.95)",fontSize:13,fontFamily:MONO,fontWeight:700,letterSpacing:"0.08em",cursor:"pointer",boxShadow:"0 0 24px rgba(167,139,250,0.12)",transition:"all 0.2s"}}
+          onMouseEnter={e=>{e.currentTarget.style.background="rgba(167,139,250,0.2)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(167,139,250,0.12)";}}>CREATE ACCOUNT →</button>
+        <button onClick={()=>reset("login")} style={{width:"100%",padding:"14px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:13,color:"rgba(255,255,255,0.5)",fontSize:13,fontFamily:MONO,fontWeight:600,letterSpacing:"0.08em",cursor:"pointer",transition:"all 0.2s"}}
+          onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.06)";e.currentTarget.style.color="rgba(255,255,255,0.75)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.03)";e.currentTarget.style.color="rgba(255,255,255,0.5)";}}>SIGN IN</button>
+      </div>
+    </div>
+  );
+
+  if(mode==="register") return wrap(<>
+    <Logo/><BackBtn onClick={()=>reset("choose")}/>
+    <div style={{fontSize:26,fontWeight:700,color:"#fff",marginBottom:4,letterSpacing:"-0.03em"}}>Create account</div>
+    <div style={{fontSize:13,color:"rgba(255,255,255,0.3)",marginBottom:"1.5rem",lineHeight:1.5}}>First time? Set up your profile.</div>
+    {/* Profile pic */}
+    <div style={{marginBottom:18}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+        <span style={{fontSize:10,fontFamily:MONO,color:"rgba(255,255,255,0.28)",letterSpacing:"0.11em"}}>PROFILE PICTURE</span>
+        <span style={{fontSize:9,fontFamily:MONO,padding:"2px 8px",background:preview?"rgba(52,211,153,0.08)":"rgba(251,113,133,0.08)",border:`1px solid ${preview?"rgba(52,211,153,0.2)":"rgba(251,113,133,0.2)"}`,borderRadius:99,color:preview?"rgba(52,211,153,0.7)":"rgba(251,113,133,0.7)"}}>
+          {preview?"✓ UPLOADED":"REQUIRED"}
+        </span>
+      </div>
+      <div onClick={()=>fileRef.current.click()} style={{display:"flex",alignItems:"center",gap:16,padding:"14px 16px",background:preview?"rgba(52,211,153,0.04)":"rgba(255,255,255,0.02)",border:`1.5px dashed ${preview?"rgba(52,211,153,0.35)":"rgba(251,113,133,0.25)"}`,borderRadius:14,cursor:"pointer",transition:"all 0.2s"}}
+        onMouseEnter={e=>{e.currentTarget.style.background=preview?"rgba(52,211,153,0.07)":"rgba(167,139,250,0.04)";e.currentTarget.style.borderColor=preview?"rgba(52,211,153,0.55)":"rgba(167,139,250,0.35)";}}
+        onMouseLeave={e=>{e.currentTarget.style.background=preview?"rgba(52,211,153,0.04)":"rgba(255,255,255,0.02)";e.currentTarget.style.borderColor=preview?"rgba(52,211,153,0.35)":"rgba(251,113,133,0.25)";}}>
+        <div style={{width:52,height:52,borderRadius:"50%",overflow:"hidden",flexShrink:0,background:"rgba(255,255,255,0.04)",border:`1px solid ${preview?"rgba(52,211,153,0.3)":"rgba(255,255,255,0.08)"}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          {preview?<img src={preview} style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="rgba(251,113,133,0.55)" strokeWidth="1.5"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="rgba(251,113,133,0.55)" strokeWidth="1.5" strokeLinecap="round"/></svg>}
+        </div>
+        <div>
+          <div style={{fontSize:13,fontWeight:500,fontFamily:SANS,color:preview?"rgba(52,211,153,0.9)":"rgba(255,255,255,0.5)",marginBottom:2}}>{preview?"Photo uploaded":"Upload your photo"}</div>
+          <div style={{fontSize:11,fontFamily:SANS,color:"rgba(255,255,255,0.22)"}}>Shown on the leaderboard · required</div>
+        </div>
+      </div>
+      <input ref={fileRef} type="file" accept="image/*" onChange={handlePic} style={{display:"none"}}/>
+    </div>
+    <InputField label="USERNAME"         value={username} onChange={setUsername} placeholder="e.g. Retzy"          onEnter={doRegister}/>
+    <InputField label="EMAIL ADDRESS"    value={email}    onChange={setEmail}    placeholder="you@example.com" type="email"    onEnter={doRegister}/>
+    <InputField label="PASSWORD"         value={password} onChange={setPassword} placeholder="Min. 6 characters" type="password" onEnter={doRegister}/>
+    <InputField label="CONFIRM PASSWORD" value={confirm}  onChange={setConfirm}  placeholder="Repeat password"  type="password" onEnter={doRegister}/>
+    <ErrBox msg={err}/>
+    <PBtn onClick={doRegister} disabled={loading}>{loading?<><Spin/> CREATING ACCOUNT...</>:"CREATE ACCOUNT →"}</PBtn>
+    <div style={{marginTop:16,textAlign:"center",fontSize:12,fontFamily:SANS,color:"rgba(255,255,255,0.25)"}}>Already registered? <span onClick={()=>reset("login")} style={{color:"rgba(196,181,253,0.6)",cursor:"pointer",fontWeight:500}} onMouseEnter={e=>e.currentTarget.style.color="rgba(196,181,253,0.9)"} onMouseLeave={e=>e.currentTarget.style.color="rgba(196,181,253,0.6)"}>Sign in</span></div>
+  </>);
+
+  return wrap(<>
+    <Logo/><BackBtn onClick={()=>reset("choose")}/>
+    <div style={{fontSize:26,fontWeight:700,color:"#fff",marginBottom:4,letterSpacing:"-0.03em"}}>Sign in</div>
+    <div style={{fontSize:13,color:"rgba(255,255,255,0.3)",marginBottom:"1.75rem",lineHeight:1.5}}>Welcome back. Enter your credentials.</div>
+    <InputField label="EMAIL"    value={email}    onChange={setEmail}    placeholder="you@example.com" type="email"    onEnter={doLogin}/>
+    <InputField label="PASSWORD" value={password} onChange={setPassword} placeholder="Your password"   type="password" onEnter={doLogin}/>
+    <ErrBox msg={err}/>
+    <PBtn onClick={doLogin} disabled={loading}>{loading?<><Spin/> SIGNING IN...</>:"SIGN IN →"}</PBtn>
+    <div style={{marginTop:16,textAlign:"center",fontSize:12,fontFamily:SANS,color:"rgba(255,255,255,0.25)"}}>New here? <span onClick={()=>reset("register")} style={{color:"rgba(196,181,253,0.6)",cursor:"pointer",fontWeight:500}} onMouseEnter={e=>e.currentTarget.style.color="rgba(196,181,253,0.9)"} onMouseLeave={e=>e.currentTarget.style.color="rgba(196,181,253,0.6)"}>Create an account</span></div>
+  </>);
+}
+
+/* ── SubmitPanel ─────────────────────────────────────────── */
+function SubmitPanel({ user, students, onClose, onSubmit }) {
+  const [trades,setTrades]     = useState("");
+  const [wins,setWins]         = useState("");
+  const [pnl,setPnl]           = useState("");
+  const [hideP,setHideP]       = useState(false);
+  const [proofs,setProofs]     = useState([]);
+  const [lightbox,setLightbox] = useState(null);
+  const [err,setErr]           = useState("");
+  const [busy,setBusy]         = useState(false);
+  const proofRef = useRef();
+
+  const addProofs = e => {
+    [...e.target.files].forEach(f => {
+      const r = new FileReader();
+      r.onload = ev => setProofs(p => [...p,{file:f,preview:ev.target.result}]);
+      r.readAsDataURL(f);
+    });
+    e.target.value="";
+  };
+  const removeProof = i => setProofs(p => p.filter((_,idx)=>idx!==i));
+
+  const go = () => {
+    setErr("");
+    const t=parseInt(trades)||0, w=parseInt(wins)||0;
+    if(t<=0)             return setErr("Enter at least 1 trade.");
+    if(w>t)              return setErr("Wins can't exceed total trades.");
+    if(proofs.length===0) return setErr("At least one trade screenshot is required.");
+    setBusy(true);
+    onSubmit({ trades:t, wins:w, pnl:parseFloat(pnl)||0, hidePnl:hideP, proofs });
+  };
+
+  const pnlNum  = parseFloat(pnl)||0;
+  const isProfit = pnlNum>0, isLoss = pnlNum<0;
+  const pnlCol   = isProfit?G:isLoss?R:"rgba(255,255,255,0.5)";
+  const tN=parseInt(trades)||0, wN=parseInt(wins)||0;
+  const liveWR   = tN>0?(wN/tN)*100:null;
+  const existing = students.find(s=>s.id===user.id);
+  const newPnl   = (existing?.pnl||0)+pnlNum;
+
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:200,display:"flex",justifyContent:"flex-end"}} onClick={onClose}>
+      <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(14px)"}}/>
+      <div onClick={e=>e.stopPropagation()} className="panel-enter" style={{position:"relative",width:440,maxWidth:"95vw",height:"100vh",background:"#07070f",borderLeft:"1px solid rgba(167,139,250,0.1)",display:"flex",flexDirection:"column",fontFamily:SANS,boxShadow:"-32px 0 100px rgba(0,0,0,0.8)"}}>
+        <div style={{position:"absolute",top:"-60px",right:"-60px",width:"260px",height:"260px",borderRadius:"50%",background:"radial-gradient(circle,rgba(167,139,250,0.11),transparent 65%)",pointerEvents:"none"}}/>
+        <div style={{position:"absolute",bottom:"80px",left:"-50px",width:"220px",height:"220px",borderRadius:"50%",background:"radial-gradient(circle,rgba(52,211,153,0.07),transparent 65%)",pointerEvents:"none"}}/>
+
+        {/* HEADER */}
+        <div style={{padding:"26px 26px 20px",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+            <span style={{fontSize:9,fontFamily:MONO,color:"rgba(255,255,255,0.18)",letterSpacing:"0.14em"}}>PERFORMANCE / LOG</span>
+            <button onClick={onClose} style={{width:28,height:28,borderRadius:"50%",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",color:"rgba(255,255,255,0.4)",fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
+              onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.09)";e.currentTarget.style.color="#fff";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.04)";e.currentTarget.style.color="rgba(255,255,255,0.4)";}}>✕</button>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:13,padding:"13px 15px",background:"rgba(167,139,250,0.04)",border:"1px solid rgba(167,139,250,0.1)",borderRadius:14}}>
+            <Avatar name={user.name} pic={user.pic} size={46}/>
+            <div>
+              <div style={{fontSize:18,fontWeight:600,color:"#fff",letterSpacing:"-0.025em",fontFamily:SANS}}>{user.name}</div>
+              <div style={{fontSize:11,fontFamily:MONO,color:"rgba(167,139,250,0.5)",letterSpacing:"0.05em",marginTop:2}}>logging today's session</div>
+            </div>
+            {pnlNum!==0&&<div style={{marginLeft:"auto",textAlign:"right"}}>
+              <div style={{fontSize:9,fontFamily:MONO,color:"rgba(255,255,255,0.2)",letterSpacing:"0.08em",marginBottom:3}}>NEW TOTAL</div>
+              <div style={{fontSize:15,fontFamily:MONO,fontWeight:700,color:newPnl>=0?G:R,textShadow:`0 0 12px ${newPnl>=0?G:R}66`}}>{fmt(newPnl)}</div>
+            </div>}
+          </div>
+        </div>
+
+        {/* BODY */}
+        <div style={{flex:1,overflowY:"auto",padding:"28px 26px 32px"}}>
+          {/* P&L */}
+          <div style={{marginBottom:22}}>
+            <div style={{fontSize:10,fontFamily:MONO,letterSpacing:"0.13em",color:"rgba(255,255,255,0.25)",marginBottom:10}}>TODAY'S P&L</div>
+            <div style={{position:"relative"}}>
+              <span style={{position:"absolute",left:18,top:"50%",transform:"translateY(-50%)",fontSize:20,fontWeight:700,fontFamily:MONO,color:pnlNum!==0?pnlCol+"88":"rgba(255,255,255,0.18)",transition:"color 0.3s",pointerEvents:"none"}}>$</span>
+              <input type="text" inputMode="decimal" value={pnl}
+                onChange={e=>{const v=e.target.value.replace(/[^0-9.\-]/g,"");if((v.match(/\./g)||[]).length<=1&&(v.match(/\-/g)||[]).length<=1&&(v==="-"||v===""||!isNaN(Number(v))||v.endsWith(".")))setPnl(v);}}
+                placeholder="0"
+                style={{width:"100%",padding:"20px 20px 20px 40px",background:isProfit?"rgba(52,211,153,0.05)":isLoss?"rgba(251,113,133,0.05)":"rgba(255,255,255,0.03)",border:`1px solid ${isProfit?"rgba(52,211,153,0.25)":isLoss?"rgba(251,113,133,0.25)":"rgba(255,255,255,0.08)"}`,borderRadius:14,color:pnlNum!==0?pnlCol:"rgba(255,255,255,0.55)",fontSize:28,fontFamily:MONO,fontWeight:700,outline:"none",textShadow:pnlNum!==0?`0 0 20px ${pnlCol}66`:"none",boxShadow:isProfit?"0 0 30px rgba(52,211,153,0.08)":isLoss?"0 0 30px rgba(251,113,133,0.08)":"none",transition:"all 0.25s"}}
+                onFocus={e=>{e.target.style.borderColor=isProfit?"rgba(52,211,153,0.5)":isLoss?"rgba(251,113,133,0.5)":"rgba(167,139,250,0.4)";}}
+                onBlur={e=>{e.target.style.borderColor=isProfit?"rgba(52,211,153,0.25)":isLoss?"rgba(251,113,133,0.25)":"rgba(255,255,255,0.08)";}}/>
+            </div>
+            {pnlNum!==0&&<div style={{marginTop:7,fontSize:12,fontFamily:MONO,fontWeight:600,color:pnlCol,textShadow:`0 0 12px ${pnlCol}88`,letterSpacing:"0.04em"}}>{isProfit?"▲ PROFIT DAY":"▼ LOSS DAY"} · {fmt(pnlNum)}</div>}
+          </div>
+
+          {/* TRADES + WINS */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+            {[{label:"TRADES",val:trades,set:setTrades,hint:"total",ac:"rgba(255,255,255,0.45)"},{label:"WINS",val:wins,set:setWins,hint:"winning",ac:"rgba(52,211,153,0.65)"}].map(f=>(
+              <div key={f.label}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                  <span style={{fontSize:10,fontFamily:MONO,letterSpacing:"0.12em",color:f.ac}}>{f.label}</span>
+                  <span style={{fontSize:10,color:"rgba(255,255,255,0.18)",fontFamily:SANS}}>{f.hint}</span>
+                </div>
+                <input type="number" value={f.val} onChange={e=>f.set(e.target.value)} placeholder="0"
+                  style={{width:"100%",padding:"13px 14px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,color:"rgba(255,255,255,0.9)",fontSize:20,fontFamily:MONO,fontWeight:700,outline:"none",transition:"all 0.2s"}}
+                  onFocus={e=>{e.target.style.border="1px solid rgba(167,139,250,0.4)";e.target.style.background="rgba(167,139,250,0.04)";}} onBlur={e=>{e.target.style.border="1px solid rgba(255,255,255,0.07)";e.target.style.background="rgba(255,255,255,0.03)";}}/>
+              </div>
+            ))}
+          </div>
+
+          {liveWR!==null&&tN>0&&wN>=0&&wN<=tN&&<div style={{marginBottom:18,padding:"12px 16px",background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <span style={{fontSize:11,fontFamily:MONO,color:"rgba(255,255,255,0.28)",letterSpacing:"0.08em"}}>WIN RATE PREVIEW</span>
+            <span style={{fontSize:16,fontFamily:MONO,fontWeight:700,color:liveWR>=60?G:liveWR>=40?"#fde68a":R,textShadow:`0 0 14px ${liveWR>=60?G:liveWR>=40?"#fde68a":R}99`}}>{pct(liveWR)}</span>
+          </div>}
+
+          {err&&<div style={{marginBottom:16,padding:"10px 14px",background:"rgba(251,113,133,0.07)",border:"1px solid rgba(251,113,133,0.18)",borderRadius:10,color:"rgba(251,113,133,0.9)",fontSize:12,fontFamily:MONO}}>{err}</div>}
+
+          {/* SCREENSHOTS */}
+          <div style={{marginBottom:14}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+              <span style={{fontSize:10,fontFamily:MONO,letterSpacing:"0.12em",color:"rgba(255,255,255,0.3)"}}>TRADE SCREENSHOTS</span>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                {proofs.length>0&&<span style={{fontSize:9,fontFamily:MONO,color:"rgba(52,211,153,0.7)",letterSpacing:"0.06em"}}>{proofs.length} UPLOADED</span>}
+                <span style={{fontSize:9,fontFamily:MONO,letterSpacing:"0.08em",padding:"2px 8px",background:proofs.length>0?"rgba(52,211,153,0.08)":"rgba(251,113,133,0.08)",border:`1px solid ${proofs.length>0?"rgba(52,211,153,0.2)":"rgba(251,113,133,0.2)"}`,borderRadius:99,color:proofs.length>0?"rgba(52,211,153,0.7)":"rgba(251,113,133,0.7)"}}>
+                  {proofs.length>0?"✓ DONE":"REQUIRED"}
+                </span>
+              </div>
+            </div>
+            <input ref={proofRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={addProofs}/>
+            {proofs.length>0&&(
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,marginBottom:8}}>
+                {proofs.map((p,i)=>(
+                  <div key={i} style={{position:"relative",borderRadius:10,overflow:"hidden",aspectRatio:"1",border:"1px solid rgba(52,211,153,0.2)",cursor:"pointer"}} onClick={()=>setLightbox(p.preview)}>
+                    <img src={p.preview} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+                    <button onClick={e=>{e.stopPropagation();removeProof(i);}} style={{position:"absolute",top:4,right:4,width:18,height:18,borderRadius:"50%",background:"rgba(251,113,133,0.85)",border:"none",color:"#fff",fontSize:10,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>✕</button>
+                  </div>
+                ))}
+                <div onClick={()=>proofRef.current.click()} style={{aspectRatio:"1",borderRadius:10,border:"1.5px dashed rgba(167,139,250,0.3)",background:"rgba(167,139,250,0.03)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer",gap:4,transition:"all 0.2s"}}
+                  onMouseEnter={e=>{e.currentTarget.style.background="rgba(167,139,250,0.07)";e.currentTarget.style.borderColor="rgba(167,139,250,0.5)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(167,139,250,0.03)";e.currentTarget.style.borderColor="rgba(167,139,250,0.3)";}}>
+                  <span style={{fontSize:18,color:"rgba(167,139,250,0.5)"}}>+</span>
+                  <span style={{fontSize:9,fontFamily:MONO,color:"rgba(167,139,250,0.4)",letterSpacing:"0.06em"}}>ADD</span>
+                </div>
+              </div>
+            )}
+            {proofs.length===0&&(
+              <div onClick={()=>proofRef.current.click()} style={{borderRadius:14,cursor:"pointer",border:"1.5px dashed rgba(255,255,255,0.1)",background:"rgba(255,255,255,0.02)",transition:"all 0.25s"}}
+                onMouseEnter={e=>{e.currentTarget.style.border="1.5px dashed rgba(167,139,250,0.35)";e.currentTarget.style.background="rgba(167,139,250,0.03)";}} onMouseLeave={e=>{e.currentTarget.style.border="1.5px dashed rgba(255,255,255,0.1)";e.currentTarget.style.background="rgba(255,255,255,0.02)";}}>
+                <div style={{padding:"22px 16px",display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
+                  <div style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5"/><circle cx="8.5" cy="8.5" r="1.5" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5"/><path d="M21 15l-5-5L5 21" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </div>
+                  <div style={{fontSize:13,fontFamily:SANS,fontWeight:500,color:"rgba(255,255,255,0.45)"}}>Upload trade screenshots</div>
+                  <div style={{fontSize:10,fontFamily:MONO,color:"rgba(255,255,255,0.18)",letterSpacing:"0.06em"}}>MULTIPLE ALLOWED · ONLY VISIBLE TO MENTORS</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* LIGHTBOX */}
+          {lightbox&&<div onClick={()=>setLightbox(null)} style={{position:"fixed",inset:0,zIndex:999,background:"rgba(0,0,0,0.88)",backdropFilter:"blur(10px)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <img src={lightbox} style={{maxWidth:"90vw",maxHeight:"90vh",borderRadius:14,boxShadow:"0 0 60px rgba(0,0,0,0.8)"}} onClick={e=>e.stopPropagation()}/>
+            <button onClick={()=>setLightbox(null)} style={{position:"fixed",top:20,right:24,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:"50%",width:36,height:36,color:"#fff",fontSize:16,cursor:"pointer"}}>✕</button>
+          </div>}
+
+          {/* PRIVACY */}
+          <div onClick={()=>setHideP(h=>!h)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"15px 16px",marginBottom:18,borderRadius:14,cursor:"pointer",background:hideP?"rgba(167,139,250,0.08)":"rgba(255,255,255,0.02)",border:`1px solid ${hideP?"rgba(167,139,250,0.3)":"rgba(255,255,255,0.07)"}`,boxShadow:hideP?"0 0 28px rgba(167,139,250,0.12)":"none",transition:"all 0.28s cubic-bezier(0.34,1.56,0.64,1)"}}>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:34,height:34,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,background:hideP?"rgba(167,139,250,0.14)":"rgba(255,255,255,0.04)",border:`1px solid ${hideP?"rgba(167,139,250,0.3)":"rgba(255,255,255,0.07)"}`,boxShadow:hideP?"0 0 16px rgba(167,139,250,0.28)":"none",transition:"all 0.28s"}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  {hideP?<><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinecap="round"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinecap="round"/><line x1="1" y1="1" x2="23" y2="23" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinecap="round"/></>:<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="rgba(255,255,255,0.35)" strokeWidth="2"/><circle cx="12" cy="12" r="3" stroke="rgba(255,255,255,0.35)" strokeWidth="2"/></>}
+                </svg>
+              </div>
+              <div>
+                <div style={{fontSize:15,fontWeight:600,fontFamily:SANS,letterSpacing:"-0.02em",color:hideP?"rgba(220,210,255,0.97)":"rgba(255,255,255,0.55)",textShadow:hideP?"0 0 18px rgba(167,139,250,0.55)":"none",transition:"all 0.25s",lineHeight:1.2}}>Privacy Mode</div>
+                <div style={{fontSize:11,fontFamily:SANS,marginTop:3,color:hideP?"rgba(167,139,250,0.6)":"rgba(255,255,255,0.22)"}}>{hideP?"P&L hidden · rank still counts":"P&L visible to everyone"}</div>
+              </div>
+            </div>
+            <div style={{width:42,height:23,borderRadius:99,position:"relative",flexShrink:0,background:hideP?"rgba(167,139,250,0.45)":"rgba(255,255,255,0.07)",border:`1px solid ${hideP?"rgba(167,139,250,0.5)":"rgba(255,255,255,0.1)"}`,boxShadow:hideP?"0 0 14px rgba(167,139,250,0.35)":"none",transition:"all 0.28s"}}>
+              <div style={{position:"absolute",top:3,left:hideP?"calc(100% - 20px)":"3px",width:15,height:15,borderRadius:"50%",background:hideP?"rgba(210,196,255,0.95)":"rgba(255,255,255,0.28)",transition:"all 0.28s cubic-bezier(0.34,1.56,0.64,1)"}}/>
+            </div>
+          </div>
+
+          <button onClick={go} disabled={busy} style={{width:"100%",padding:"15px",background:"rgba(52,211,153,0.08)",border:"1px solid rgba(52,211,153,0.22)",borderRadius:14,color:"rgba(52,211,153,0.95)",fontSize:12,fontFamily:MONO,fontWeight:700,letterSpacing:"0.1em",cursor:"pointer",boxShadow:"0 0 28px rgba(52,211,153,0.09)",transition:"all 0.2s",opacity:busy?0.7:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}
+            onMouseEnter={e=>{if(!busy){e.currentTarget.style.background="rgba(52,211,153,0.15)";e.currentTarget.style.boxShadow="0 0 40px rgba(52,211,153,0.22)";e.currentTarget.style.transform="translateY(-1px)";}}}
+            onMouseLeave={e=>{e.currentTarget.style.background="rgba(52,211,153,0.08)";e.currentTarget.style.boxShadow="0 0 28px rgba(52,211,153,0.09)";e.currentTarget.style.transform="translateY(0)";}}>
+            {busy?<><Spin/> SUBMITTING...</>:"SUBMIT SESSION →"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── PnL Logs ────────────────────────────────────────────── */
+function PnlLogs({ user, sessions }) {
+  const mine = sessions.filter(s=>s.user_id===user.id);
+  const totPnl    = mine.reduce((a,s)=>a+s.pnl,0);
+  const totTrades = mine.reduce((a,s)=>a+s.trades,0);
+  const totWins   = mine.reduce((a,s)=>a+s.wins,0);
+  const [lb,setLb]=useState(null);
+  return (
+    <div style={{padding:"44px 32px",maxWidth:860,margin:"0 auto",animation:"fadeIn 0.4s ease"}}>
+      <div style={{marginBottom:"2rem"}}>
+        <h1 style={{margin:0,fontSize:42,fontWeight:700,fontFamily:SANS,letterSpacing:"-0.035em",color:"rgba(255,255,255,0.93)"}}>PnL Logs</h1>
+        <p style={{margin:"8px 0 0",fontSize:11,fontFamily:MONO,color:"rgba(255,255,255,0.22)",letterSpacing:"0.08em"}}>YOUR SUBMITTED TRADING HISTORY</p>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:28}}>
+        {[{l:"TOTAL P&L",v:fmt(totPnl),c:totPnl>=0?G:R,glow:totPnl>=0?G:R},{l:"TOTAL TRADES",v:String(totTrades),c:"rgba(255,255,255,0.85)"},{l:"WIN RATE",v:totTrades>0?pct((totWins/totTrades)*100):"—",c:totTrades>0&&(totWins/totTrades)>=0.6?"#86efac":totTrades>0&&(totWins/totTrades)>=0.4?"#fde68a":R}].map(c=>(
+          <div key={c.l} style={{background:"rgba(255,255,255,0.025)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:16,padding:"18px 20px"}}>
+            <div style={{fontSize:9,fontFamily:MONO,color:"rgba(255,255,255,0.28)",letterSpacing:"0.12em",marginBottom:8}}>{c.l}</div>
+            <div style={{fontSize:26,fontWeight:700,fontFamily:MONO,color:c.c,textShadow:c.glow?`0 0 16px ${c.glow}55`:"none"}}>{c.v}</div>
+          </div>
+        ))}
+      </div>
+      {mine.length===0
+        ?<div style={{textAlign:"center",padding:"72px 32px",border:"1px solid rgba(255,255,255,0.05)",borderRadius:18,background:"rgba(255,255,255,0.01)"}}>
+          <div style={{fontSize:32,marginBottom:12}}>📋</div>
+          <div style={{fontFamily:MONO,fontSize:12,color:"rgba(255,255,255,0.2)",letterSpacing:"0.1em"}}>NO SESSIONS YET</div>
+          <div style={{fontFamily:SANS,fontSize:13,color:"rgba(255,255,255,0.18)",marginTop:6}}>Submit your first P&L to see it here</div>
+        </div>
+        :<div style={{display:"flex",flexDirection:"column",gap:12}}>
+          {[...mine].reverse().map((s,i)=>{
+            const isWin=s.pnl>=0; const wr=s.trades>0?(s.wins/s.trades)*100:0;
+            return (
+              <div key={i} style={{border:`1px solid ${isWin?"rgba(52,211,153,0.12)":"rgba(251,113,133,0.1)"}`,borderRadius:16,background:"rgba(255,255,255,0.02)",overflow:"hidden"}}>
+                <div style={{display:"grid",gridTemplateColumns:"1fr auto auto auto",gap:16,alignItems:"center",padding:"16px 20px",borderBottom:s.proof_urls?.length?"1px solid rgba(255,255,255,0.04)":"none"}}>
+                  <div>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                      <div style={{width:6,height:6,borderRadius:"50%",background:isWin?G:R,boxShadow:`0 0 6px ${isWin?G:R}`}}/>
+                      <span style={{fontFamily:MONO,fontSize:10,color:"rgba(255,255,255,0.3)",letterSpacing:"0.08em"}}>{s.date}</span>
+                      {s.hide_pnl&&<span style={{fontSize:9,fontFamily:MONO,color:"rgba(167,139,250,0.45)",padding:"1px 6px",border:"1px solid rgba(167,139,250,0.15)",borderRadius:99}}>PRIVATE</span>}
+                    </div>
+                    <div style={{fontFamily:MONO,fontSize:22,fontWeight:700,color:isWin?G:R,textShadow:`0 0 14px ${isWin?G:R}55`}}>{s.hide_pnl?"——":fmt(s.pnl)}</div>
+                  </div>
+                  {[{l:"TRADES",v:s.trades,c:"rgba(255,255,255,0.75)"},{l:"WINS",v:s.wins,c:G},{l:"WIN %",v:pct(wr),c:wr>=60?"#86efac":wr>=40?"#fde68a":R}].map(x=>(
+                    <div key={x.l} style={{textAlign:"center"}}>
+                      <div style={{fontSize:9,fontFamily:MONO,color:"rgba(255,255,255,0.2)",letterSpacing:"0.1em",marginBottom:4}}>{x.l}</div>
+                      <div style={{fontSize:18,fontFamily:MONO,fontWeight:700,color:x.c}}>{x.v}</div>
+                    </div>
+                  ))}
+                </div>
+                {s.proof_urls?.length>0&&<div style={{padding:"12px 20px",display:"flex",gap:8,flexWrap:"wrap"}}>
+                  {s.proof_urls.map((src,j)=>(
+                    <img key={j} src={src} onClick={()=>setLb(src)} style={{width:64,height:64,objectFit:"cover",borderRadius:8,cursor:"pointer",border:"1px solid rgba(255,255,255,0.08)",transition:"all 0.2s"}}
+                      onMouseEnter={e=>{e.currentTarget.style.border="1px solid rgba(167,139,250,0.4)";e.currentTarget.style.transform="scale(1.05)";}} onMouseLeave={e=>{e.currentTarget.style.border="1px solid rgba(255,255,255,0.08)";e.currentTarget.style.transform="scale(1)";}}/>
+                  ))}
+                </div>}
+              </div>
+            );
+          })}
+        </div>
+      }
+      {lb&&<div onClick={()=>setLb(null)} style={{position:"fixed",inset:0,zIndex:999,background:"rgba(0,0,0,0.88)",backdropFilter:"blur(10px)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <img src={lb} style={{maxWidth:"90vw",maxHeight:"90vh",borderRadius:14,boxShadow:"0 0 60px rgba(0,0,0,0.8)"}} onClick={e=>e.stopPropagation()}/>
+        <button onClick={()=>setLb(null)} style={{position:"fixed",top:20,right:24,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:"50%",width:36,height:36,color:"#fff",fontSize:16,cursor:"pointer"}}>✕</button>
+      </div>}
+    </div>
+  );
+}
+
+/* ── NavUserMenu ─────────────────────────────────────────── */
+function NavUserMenu({ user, onLogout, onSubmit }) {
+  const [open,setOpen]=useState(false);
+  const ref=useRef();
+  useEffect(()=>{ const h=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false);}; document.addEventListener("mousedown",h); return()=>document.removeEventListener("mousedown",h); },[]);
+  const hues=[258,280,240,310,265,250,295]; const h=hues[user.name.charCodeAt(0)%hues.length];
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:10}} ref={ref}>
+      <button onClick={onSubmit} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 16px",background:"rgba(167,139,250,0.08)",border:"1px solid rgba(167,139,250,0.2)",borderRadius:99,color:"rgba(196,181,253,0.9)",fontSize:11,cursor:"pointer",fontWeight:600,letterSpacing:"0.05em",fontFamily:MONO,boxShadow:"0 0 16px rgba(167,139,250,0.1)",transition:"all 0.2s"}}
+        onMouseEnter={e=>{e.currentTarget.style.background="rgba(167,139,250,0.14)";e.currentTarget.style.boxShadow="0 0 24px rgba(167,139,250,0.2)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(167,139,250,0.08)";e.currentTarget.style.boxShadow="0 0 16px rgba(167,139,250,0.1)";}}>SUBMIT P&L</button>
+      <div style={{position:"relative"}}>
+        <div onClick={()=>setOpen(o=>!o)} style={{width:36,height:36,borderRadius:"50%",cursor:"pointer",flexShrink:0,overflow:"hidden",border:`1.5px solid ${open?"rgba(167,139,250,0.7)":"rgba(255,255,255,0.1)"}`,boxShadow:open?`0 0 18px hsla(${h},80%,65%,0.55),0 0 36px rgba(167,139,250,0.3)`:`0 0 10px hsla(${h},80%,65%,0.25)`,transition:"all 0.25s cubic-bezier(0.34,1.56,0.64,1)"}}>
+          <Avatar name={user.name} pic={user.pic} size={36}/>
+        </div>
+        {open&&<div style={{position:"absolute",top:"calc(100% + 10px)",right:0,minWidth:200,background:"#0c0c18",border:"1px solid rgba(167,139,250,0.2)",borderRadius:16,boxShadow:"0 16px 48px rgba(0,0,0,0.7),0 0 40px rgba(167,139,250,0.12)",overflow:"hidden",animation:"fadeIn 0.18s ease",zIndex:50}}>
+          <div style={{padding:"14px 16px",borderBottom:"1px solid rgba(255,255,255,0.05)",display:"flex",alignItems:"center",gap:11,background:"rgba(167,139,250,0.04)"}}>
+            <div style={{position:"relative",flexShrink:0}}>
+              <Avatar name={user.name} pic={user.pic} size={38}/>
+              <div style={{position:"absolute",bottom:1,right:1,width:9,height:9,borderRadius:"50%",background:G,border:"1.5px solid #0c0c18",boxShadow:`0 0 8px ${G}`}}/>
+            </div>
+            <div>
+              <div style={{fontSize:14,fontWeight:700,fontFamily:SANS,color:"#fff",letterSpacing:"-0.02em"}}>{user.name}</div>
+              <div style={{fontSize:10,fontFamily:MONO,color:"rgba(52,211,153,0.6)",letterSpacing:"0.06em",marginTop:2}}>● ACTIVE</div>
+            </div>
+          </div>
+          <div style={{padding:"8px"}}>
+            <button onClick={()=>{setOpen(false);onLogout();}} style={{width:"100%",padding:"11px 14px",borderRadius:10,cursor:"pointer",background:"rgba(251,113,133,0.06)",border:"1px solid rgba(251,113,133,0.15)",color:"rgba(251,113,133,0.85)",fontFamily:MONO,fontSize:11,fontWeight:700,letterSpacing:"0.08em",display:"flex",alignItems:"center",gap:8,transition:"all 0.2s"}}
+              onMouseEnter={e=>{e.currentTarget.style.background="rgba(251,113,133,0.13)";e.currentTarget.style.borderColor="rgba(251,113,133,0.35)";e.currentTarget.style.color="rgba(251,113,133,1)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(251,113,133,0.06)";e.currentTarget.style.borderColor="rgba(251,113,133,0.15)";e.currentTarget.style.color="rgba(251,113,133,0.85)";}}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><polyline points="16,17 21,12 16,7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+              SIGN OUT
+            </button>
+          </div>
+        </div>}
+      </div>
+    </div>
+  );
+}
+
+/* ── App ─────────────────────────────────────────────────── */
+function App() {
+  const [students,    setStudents]    = useState([]);
+  const [prevStudents,setPrevStudents]= useState([]);
+  const [sessions,    setSessions]    = useState([]);
+  const [showSub,     setShowSub]     = useState(false);
+  const [selected,    setSelected]    = useState(null);
+  const [tick,        setTick]        = useState(0);
+  const [user,        setUser]        = useState(null);
+  const [toast,       setToast]       = useState(null);
+  const [newIds,      setNewIds]      = useState(new Set());
+  const [activePage,  setActivePage]  = useState("leaderboard");
+  const [appLoading,  setAppLoading]  = useState(true);
+
+  useEffect(()=>{ const t=setInterval(()=>setTick(x=>x+1),60); return()=>clearInterval(t); },[]);
+  const livePulse = Math.sin(tick*0.05)*0.4+0.6;
+
+  /* restore session on page load */
+  useEffect(()=>{
+    SUPA.auth.getSession().then(async({data:{session}})=>{
+      if(session){
+        const {data:p}=await SUPA.from('profiles').select('*').eq('id',session.user.id).single();
+        if(p) setUser({name:p.display_name,pic:p.avatar_url,id:session.user.id,email:session.user.email});
+      }
+      setAppLoading(false);
+    });
+    SUPA.auth.onAuthStateChange((_,session)=>{ if(!session) setUser(null); });
+  },[]);
+
+  const fetchLeaderboard = async () => {
+    const {data}=await SUPA.from('traders').select('*').order('pnl',{ascending:false});
+    if(data) setStudents(data.map(t=>computeStats({id:t.id,name:t.display_name,pic:t.avatar_url,pnl:t.pnl,trades:t.trades,wins:t.wins,hidePnl:t.hide_pnl})));
+  };
+  const fetchSessions = async () => {
+    const {data}=await SUPA.from('sessions').select('*').order('submitted_at',{ascending:false});
+    if(data) setSessions(data.map(s=>({...s,date:new Date(s.submitted_at).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})+" · "+new Date(s.submitted_at).toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"})})));
+  };
+
+  useEffect(()=>{
+    fetchLeaderboard(); fetchSessions();
+    const ch=SUPA.channel('traders-rt').on('postgres_changes',{event:'*',schema:'public',table:'traders'},fetchLeaderboard).subscribe();
+    return()=>SUPA.removeChannel(ch);
+  },[]);
+
+  const ranked     = useMemo(()=>[...students].sort((a,b)=>b.pnl-a.pnl).map((s,i)=>({...s,rank:i+1})),[students]);
+  const prevRanked = useMemo(()=>[...prevStudents].sort((a,b)=>b.pnl-a.pnl).map((s,i)=>({...s,rank:i+1})),[prevStudents]);
+  const totals     = useMemo(()=>({pnl:students.reduce((a,x)=>a+x.pnl,0),wr:students.length?students.reduce((a,x)=>a+x.winRate,0)/students.length:0,trades:students.reduce((a,x)=>a+x.trades,0),active:students.length}),[students]);
+  const myCount    = user?sessions.filter(s=>s.user_id===user.id).length:0;
+
+  const handleLogin = u => {
+    setUser(u); setToast({msg:`Welcome, ${u.name}!`});
+    if(!students.find(s=>s.id===u.id)){ setNewIds(s=>{const n=new Set(s);n.add(u.id);return n;}); setTimeout(()=>setNewIds(s=>{const n=new Set(s);n.delete(u.id);return n;}),800); }
+    fetchLeaderboard(); fetchSessions();
+  };
+  const handleLogout = async () => { await SUPA.auth.signOut(); setUser(null); setActivePage("leaderboard"); };
+
+  const handleSubmit = async (data) => {
+    const uid=user.id;
+    try {
+      /* upload screenshots */
+      const proofUrls = await Promise.all(
+        data.proofs.map((p,i)=>uploadImg(p.preview,`proofs/${uid}/${Date.now()}-${i}.jpg`))
+      );
+      /* current totals */
+      const {data:cur}=await SUPA.from('traders').select('*').eq('id',uid).single();
+      setPrevStudents([...students]);
+      /* update leaderboard row */
+      await SUPA.from('traders').update({pnl:cur.pnl+data.pnl,trades:cur.trades+data.trades,wins:cur.wins+data.wins,hide_pnl:data.hidePnl,updated_at:new Date().toISOString()}).eq('id',uid);
+      /* log session */
+      await SUPA.from('sessions').insert({user_id:uid,pnl:data.pnl,trades:data.trades,wins:data.wins,hide_pnl:data.hidePnl,proof_urls:proofUrls});
+      await fetchSessions();
+      setShowSub(false);
+      setToast({msg:"Session logged! 🎯"});
+    } catch(e) {
+      setShowSub(false);
+      setToast({msg:e.message||"Submit failed.",isError:true});
+    }
+  };
+
+  if(appLoading) return (
+    <div style={{position:"fixed",inset:0,background:"#080810",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16}}>
+      <Spin/><span style={{fontFamily:MONO,fontSize:11,color:"rgba(255,255,255,0.3)",letterSpacing:"0.1em"}}>LOADING TICKERS</span>
+    </div>
+  );
+
+  return (
+    <div style={{background:"#080810",minHeight:"100vh",color:"#fff",fontFamily:SANS,position:"relative",overflow:"hidden"}}>
+      <div style={{position:"fixed",top:"-15%",left:"-12%",width:"50vw",height:"50vw",borderRadius:"50%",pointerEvents:"none",zIndex:0,background:"radial-gradient(circle,rgba(167,139,250,0.12),transparent 65%)"}}/>
+      <div style={{position:"fixed",top:"15%",right:"-12%",width:"40vw",height:"40vw",borderRadius:"50%",pointerEvents:"none",zIndex:0,background:"radial-gradient(circle,rgba(99,179,237,0.07),transparent 65%)"}}/>
+      <div style={{position:"fixed",bottom:"-10%",left:"18%",width:"45vw",height:"45vw",borderRadius:"50%",pointerEvents:"none",zIndex:0,background:"radial-gradient(circle,rgba(167,139,250,0.07),transparent 65%)"}}/>
+      <div style={{position:"fixed",bottom:"8%",right:"6%",width:"25vw",height:"25vw",borderRadius:"50%",pointerEvents:"none",zIndex:0,background:"radial-gradient(circle,rgba(52,211,153,0.05),transparent 65%)"}}/>
+
+      {!user&&<LoginScreen onLogin={handleLogin}/>}
+
+      <div style={{position:"relative",zIndex:1}}>
+        {/* NAV */}
+        <div style={{borderBottom:"1px solid rgba(255,255,255,0.06)",padding:"0 32px",display:"flex",alignItems:"center",justifyContent:"space-between",backdropFilter:"blur(24px)",background:"rgba(8,8,16,0.7)",position:"sticky",top:0,zIndex:10,height:60}}>
+          <div style={{display:"flex",alignItems:"center",gap:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:9,marginRight:28}}>
+              <div style={{width:32,height:32,borderRadius:9,background:"rgba(167,139,250,0.1)",border:"1px solid rgba(167,139,250,0.22)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 0 16px rgba(167,139,250,0.2)"}}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polygon points="12,2 22,20 2,20" fill="none" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinejoin="round"/><polygon points="12,7 18,20 6,20" fill="rgba(196,181,253,0.18)" strokeLinejoin="round"/></svg>
+              </div>
+              <span style={{fontWeight:700,fontSize:13,letterSpacing:"0.14em",color:"rgba(255,255,255,0.92)",fontFamily:MONO,textShadow:"0 0 16px rgba(196,181,253,0.35)"}}>TICKERS</span>
+            </div>
+            {[
+              {id:"leaderboard",label:"Leaderboard",icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="12" width="4" height="10" rx="1" stroke="currentColor" strokeWidth="1.8"/><rect x="9" y="7" width="4" height="15" rx="1" stroke="currentColor" strokeWidth="1.8"/><rect x="16" y="2" width="4" height="20" rx="1" stroke="currentColor" strokeWidth="1.8"/></svg>},
+              {id:"pnllogs",label:"PnL Logs",icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><line x1="9" y1="13" x2="15" y2="13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><line x1="9" y1="17" x2="13" y2="17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>,badge:myCount},
+            ].map(tab=>{
+              const active=activePage===tab.id;
+              return <button key={tab.id} onClick={()=>setActivePage(tab.id)} style={{display:"flex",alignItems:"center",gap:6,padding:"0 16px",height:60,background:"none",border:"none",cursor:"pointer",position:"relative",color:active?"rgba(196,181,253,0.95)":"rgba(255,255,255,0.3)",fontFamily:MONO,fontSize:12,fontWeight:600,letterSpacing:"0.05em",transition:"color 0.2s"}}
+                onMouseEnter={e=>{if(!active)e.currentTarget.style.color="rgba(255,255,255,0.6)";}} onMouseLeave={e=>{if(!active)e.currentTarget.style.color="rgba(255,255,255,0.3)";}}>
+                {tab.icon}{tab.label}
+                {tab.badge>0&&<span style={{fontSize:9,fontFamily:MONO,padding:"1px 5px",background:"rgba(167,139,250,0.2)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:99,color:"rgba(196,181,253,0.85)",marginLeft:2}}>{tab.badge}</span>}
+                {active&&<div style={{position:"absolute",bottom:0,left:16,right:16,height:2,borderRadius:2,background:"rgba(167,139,250,0.8)",boxShadow:"0 0 8px rgba(167,139,250,0.6)"}}/>}
+              </button>;
+            })}
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <div style={{display:"flex",alignItems:"center",gap:7,fontSize:11,fontFamily:MONO,letterSpacing:"0.07em",color:"rgba(52,211,153,0.9)"}}>
+              <span style={{width:6,height:6,borderRadius:"50%",background:G,display:"inline-block",boxShadow:`0 0 ${4+livePulse*8}px ${G},0 0 ${8+livePulse*14}px ${G}55`}}/>LIVE
+            </div>
+            {user&&<NavUserMenu user={user} onLogout={handleLogout} onSubmit={()=>setShowSub(true)}/>}
+          </div>
+        </div>
+
+        {/* PAGE */}
+        {activePage==="pnllogs"&&user
+          ?<PnlLogs user={user} sessions={sessions}/>
+          :<div style={{padding:"44px 32px",maxWidth:1060,margin:"0 auto"}}>
+            <div style={{marginBottom:"2.5rem",animation:"fadeIn 0.5s ease"}}>
+              <h1 style={{margin:0,fontSize:52,fontWeight:700,fontFamily:SANS,letterSpacing:"-0.035em",lineHeight:1.05,color:"rgba(255,255,255,0.93)"}}>Leaderboard<span style={{color:"rgba(255,255,255,0.15)",fontWeight:300}}> /001</span></h1>
+              <p style={{margin:"10px 0 0",fontSize:11,fontFamily:MONO,color:"rgba(255,255,255,0.22)",letterSpacing:"0.08em"}}>TOP DAY TRADERS · RANKED BY P&L · REAL-TIME</p>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:"2.5rem"}}>
+              <StatCard label="ACTIVE TRADERS" val={String(totals.active)}/>
+              <StatCard label="TOTAL P&L"      val={fmt(totals.pnl)}  color={totals.pnl>=0?G:R} glow={totals.pnl>=0?G:R}/>
+              <StatCard label="AVG WIN RATE"   val={pct(totals.wr)}/>
+              <StatCard label="TOTAL TRADES"   val={String(totals.trades)}/>
+            </div>
+            <div style={{border:"1px solid rgba(255,255,255,0.06)",borderRadius:18,overflow:"hidden",background:"rgba(255,255,255,0.02)",backdropFilter:"blur(10px)"}}>
+              <div style={{display:"grid",gridTemplateColumns:"52px 1fr 140px 110px 80px 130px",padding:"12px 24px",borderBottom:"1px solid rgba(255,255,255,0.05)",fontFamily:MONO,fontSize:10,color:"rgba(255,255,255,0.2)",letterSpacing:"0.1em"}}>
+                <span>#</span><span>TRADER</span><span style={{textAlign:"right"}}>P&L</span><span style={{textAlign:"right"}}>WIN %</span><span style={{textAlign:"right"}}>TRADES</span><span style={{textAlign:"right"}}>AVG RET</span>
+              </div>
+              {ranked.map((t,i)=>{
+                const prev=prevRanked.find(p=>p.id===t.id);
+                return <TraderRow key={t.id} t={t} prev={prev} isNew={newIds.has(t.id)} isSelected={selected?.id===t.id} onClick={()=>setSelected(selected?.id===t.id?null:t)} isLast={i===ranked.length-1}/>;
+              })}
+              {ranked.length===0&&<div style={{padding:"48px 24px",textAlign:"center",fontFamily:MONO,fontSize:12,color:"rgba(255,255,255,0.15)",letterSpacing:"0.08em"}}>NO TRADERS YET · BE THE FIRST</div>}
+            </div>
+            <div style={{marginTop:20,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 4px"}}>
+              <span style={{fontSize:11,fontFamily:MONO,color:"rgba(255,255,255,0.32)",letterSpacing:"0.08em"}}>{ranked.length} TRADER{ranked.length!==1?"S":""}</span>
+              <span style={{fontSize:11,fontFamily:MONO,color:"rgba(167,139,250,0.5)",letterSpacing:"0.06em",display:"flex",alignItems:"center",gap:5}}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="rgba(167,139,250,0.7)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>CLICK ROW TO EXPAND
+              </span>
+            </div>
+          </div>
+        }
+      </div>
+
+      {showSub&&user&&<SubmitPanel user={user} students={students} onClose={()=>setShowSub(false)} onSubmit={handleSubmit}/>}
+      {toast&&<Toast msg={toast.msg} isError={toast.isError} onDone={()=>setToast(null)}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
