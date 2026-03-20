@@ -1087,10 +1087,12 @@ function App() {
       if(error) throw error;
       const {data:remaining, error:fetchErr} = await SUPA.from('sessions').select('*').eq('user_id', uid);
       if(fetchErr) throw fetchErr;
-      const pnl   = (remaining||[]).reduce((a,s)=>a+(s.pnl||0),0);
-      const trades= (remaining||[]).reduce((a,s)=>a+(s.trades||0),0);
-      const wins  = (remaining||[]).reduce((a,s)=>a+(s.wins||0),0);
-      await SUPA.from('traders').update({pnl,trades,wins}).eq('id',uid);
+      const pnl    = (remaining||[]).reduce((a,s)=>a+(s.pnl||0),0);
+      const trades = (remaining||[]).reduce((a,s)=>a+(s.trades||0),0);
+      const wins   = (remaining||[]).reduce((a,s)=>a+(s.wins||0),0);
+      const rrSessions = (remaining||[]).filter(s=>s.rr>0);
+      const rr_made = rrSessions.length>0 ? rrSessions.reduce((a,s)=>a+(s.rr||0),0)/rrSessions.length : 0;
+      await SUPA.from('traders').update({pnl,trades,wins,rr_made}).eq('id',uid);
       await fetchLeaderboard();
       await fetchSessions();
       setToast({msg:"Session deleted."});
