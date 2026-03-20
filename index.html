@@ -181,12 +181,26 @@ function TraderRow({ t, prev, isSelected, onClick, isLast, isNew }) {
 /* ── InputField ──────────────────────────────────────────── */
 function InputField({ label, value, onChange, placeholder, type="text", onEnter }) {
   const [focused,setFocused]=useState(false);
+  const [show,setShow]=useState(false);
+  const [hovEye,setHovEye]=useState(false);
+  const isPassword = type==="password";
+  const inputType = isPassword?(show?"text":"password"):type;
   return (
     <div style={{marginBottom:14}}>
-      <div style={{fontSize:10,fontFamily:MONO,color:focused?"rgba(196,181,253,0.6)":"rgba(255,255,255,0.28)",marginBottom:7,letterSpacing:"0.11em",transition:"color 0.2s"}}>{label}</div>
-      <input type={type} value={value} onChange={e=>onChange(e.target.value)} onKeyDown={e=>e.key==="Enter"&&onEnter&&onEnter()} placeholder={placeholder}
-        style={{width:"100%",padding:"13px 16px",background:focused?"rgba(167,139,250,0.04)":"rgba(255,255,255,0.04)",border:`1px solid ${focused?"rgba(167,139,250,0.45)":"rgba(255,255,255,0.09)"}`,borderRadius:12,color:"#fff",fontSize:15,fontFamily:SANS,outline:"none",letterSpacing:"-0.01em",fontWeight:400,transition:"all 0.2s"}}
-        onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)}/>
+      <div style={{fontSize:10,fontFamily:MONO,color:focused?"rgba(196,181,253,0.7)":"rgba(255,255,255,0.28)",marginBottom:7,letterSpacing:"0.11em",transition:"color 0.2s"}}>{label}</div>
+      <div style={{position:"relative"}}>
+        <input type={inputType} value={value} onChange={e=>onChange(e.target.value)} onKeyDown={e=>e.key==="Enter"&&onEnter&&onEnter()} placeholder={placeholder}
+          style={{width:"100%",padding:isPassword?"13px 44px 13px 16px":"13px 16px",background:focused?"rgba(167,139,250,0.06)":"rgba(255,255,255,0.04)",border:`1px solid ${focused?"rgba(167,139,250,0.55)":"rgba(255,255,255,0.09)"}`,borderRadius:12,color:"#fff",fontSize:15,fontFamily:SANS,outline:"none",letterSpacing:"-0.01em",fontWeight:400,transition:"all 0.2s",boxShadow:focused?"0 0 0 3px rgba(167,139,250,0.08)":"none"}}
+          onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)}/>
+        {isPassword&&<button type="button" onClick={()=>setShow(s=>!s)}
+          onMouseEnter={()=>setHovEye(true)} onMouseLeave={()=>setHovEye(false)}
+          style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",padding:4,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:6,transition:"all 0.2s",boxShadow:hovEye?"0 0 12px rgba(167,139,250,0.5)":"none"}}>
+          {show
+            ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke={hovEye?"rgba(196,181,253,1)":"rgba(196,181,253,0.5)"} strokeWidth="2"/><circle cx="12" cy="12" r="3" stroke={hovEye?"rgba(196,181,253,1)":"rgba(196,181,253,0.5)"} strokeWidth="2"/></svg>
+            : <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94" stroke={hovEye?"rgba(196,181,253,1)":"rgba(196,181,253,0.4)"} strokeWidth="2" strokeLinecap="round"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19" stroke={hovEye?"rgba(196,181,253,1)":"rgba(196,181,253,0.4)"} strokeWidth="2" strokeLinecap="round"/><line x1="1" y1="1" x2="23" y2="23" stroke={hovEye?"rgba(196,181,253,1)":"rgba(196,181,253,0.4)"} strokeWidth="2" strokeLinecap="round"/></svg>
+          }
+        </button>}
+      </div>
     </div>
   );
 }
@@ -260,7 +274,7 @@ const LoginScreen = React.memo(function LoginScreen({ onLogin }) {
     <div style={{position:"absolute",top:"-15%",left:"-10%",width:"50vw",height:"50vw",borderRadius:"50%",background:"radial-gradient(circle,rgba(167,139,250,0.12),transparent 65%)",pointerEvents:"none"}}/>
     <div style={{position:"absolute",bottom:"-10%",right:"-5%",width:"40vw",height:"40vw",borderRadius:"50%",background:"radial-gradient(circle,rgba(99,179,237,0.08),transparent 65%)",pointerEvents:"none"}}/>
   </>;
-  const card = {position:"relative",width:420,maxWidth:"93vw",background:"rgba(15,15,28,0.98)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:24,padding:"2.25rem",boxShadow:"0 0 80px rgba(167,139,250,0.1),0 32px 64px rgba(0,0,0,0.5)",animation:"fadeIn 0.35s ease"};
+  const card = {position:"relative",width:420,maxWidth:"100%",background:"linear-gradient(145deg,rgba(16,14,32,0.99),rgba(10,10,22,0.99))",border:"1px solid rgba(167,139,250,0.12)",borderRadius:24,padding:"2.25rem",boxShadow:"0 0 0 1px rgba(167,139,250,0.04),0 0 60px rgba(167,139,250,0.1),0 0 120px rgba(167,139,250,0.05),0 40px 80px rgba(0,0,0,0.6)",animation:"fadeIn 0.35s ease"};
   const Logo = () => (
     <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:"2rem"}}>
       <div style={{width:34,height:34,borderRadius:9,background:"rgba(167,139,250,0.1)",border:"1px solid rgba(167,139,250,0.22)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 0 18px rgba(167,139,250,0.2)"}}>
@@ -283,22 +297,27 @@ const LoginScreen = React.memo(function LoginScreen({ onLogin }) {
   );
 
   const wrap = (children) => (
-    <div style={{position:"fixed",inset:0,background:"#080810",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300,fontFamily:SANS,overflowY:"auto",padding:"24px 0"}}>
-      {BG}<div onClick={e=>e.stopPropagation()} style={{...card,margin:"24px auto",position:"relative",zIndex:301}}>{children}</div>
+    <div style={{position:"fixed",inset:0,background:"#080810",zIndex:300,fontFamily:SANS,overflowY:"auto"}}>
+      {BG}
+      <div style={{minHeight:"100%",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}}>
+        <div onClick={e=>e.stopPropagation()} style={{...card,width:"100%",position:"relative",zIndex:301}}>{children}</div>
+      </div>
     </div>
   );
 
   if(mode==="choose") return (
-    <div style={{position:"fixed",inset:0,background:"#080810",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300,fontFamily:SANS}}>
+    <div style={{position:"fixed",inset:0,background:"#080810",zIndex:300,fontFamily:SANS,overflowY:"auto"}}>
       {BG}
-      <div style={{...card}}>
-        <Logo/>
-        <div style={{fontSize:30,fontWeight:700,color:"#fff",marginBottom:5,letterSpacing:"-0.03em"}}>Welcome to Tickers</div>
-        <div style={{fontSize:14,color:"rgba(255,255,255,0.32)",marginBottom:"2.25rem",lineHeight:1.6}}>The leaderboard for serious day traders.</div>
-        <button onClick={e=>{e.stopPropagation();reset("register");}} style={{width:"100%",padding:"14px",marginBottom:10,background:"rgba(167,139,250,0.12)",border:"1px solid rgba(167,139,250,0.28)",borderRadius:13,color:"rgba(196,181,253,0.95)",fontSize:13,fontFamily:MONO,fontWeight:700,letterSpacing:"0.08em",cursor:"pointer",boxShadow:"0 0 24px rgba(167,139,250,0.12)",transition:"all 0.2s",position:"relative",zIndex:302}}
-          onMouseEnter={e=>{e.currentTarget.style.background="rgba(167,139,250,0.2)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(167,139,250,0.12)";}}>CREATE ACCOUNT →</button>
-        <button onClick={e=>{e.stopPropagation();reset("login");}} style={{width:"100%",padding:"14px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:13,color:"rgba(255,255,255,0.5)",fontSize:13,fontFamily:MONO,fontWeight:600,letterSpacing:"0.08em",cursor:"pointer",transition:"all 0.2s",position:"relative",zIndex:302}}
-          onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.06)";e.currentTarget.style.color="rgba(255,255,255,0.75)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.03)";e.currentTarget.style.color="rgba(255,255,255,0.5)";}}>SIGN IN</button>
+      <div style={{minHeight:"100%",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}}>
+        <div style={{...card,width:"100%"}}>
+          <Logo/>
+          <div style={{fontSize:30,fontWeight:700,color:"#fff",marginBottom:5,letterSpacing:"-0.03em"}}>Welcome to Tickers</div>
+          <div style={{fontSize:14,color:"rgba(255,255,255,0.32)",marginBottom:"2.25rem",lineHeight:1.6}}>The leaderboard for serious day traders.</div>
+          <button onClick={e=>{e.stopPropagation();reset("register");}} style={{width:"100%",padding:"14px",marginBottom:10,background:"rgba(167,139,250,0.12)",border:"1px solid rgba(167,139,250,0.28)",borderRadius:13,color:"rgba(196,181,253,0.95)",fontSize:13,fontFamily:MONO,fontWeight:700,letterSpacing:"0.08em",cursor:"pointer",boxShadow:"0 0 24px rgba(167,139,250,0.12)",transition:"all 0.2s",position:"relative",zIndex:302}}
+            onMouseEnter={e=>{e.currentTarget.style.background="rgba(167,139,250,0.2)";e.currentTarget.style.boxShadow="0 0 32px rgba(167,139,250,0.3)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(167,139,250,0.12)";e.currentTarget.style.boxShadow="0 0 24px rgba(167,139,250,0.12)";}}>CREATE ACCOUNT →</button>
+          <button onClick={e=>{e.stopPropagation();reset("login");}} style={{width:"100%",padding:"14px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:13,color:"rgba(255,255,255,0.5)",fontSize:13,fontFamily:MONO,fontWeight:600,letterSpacing:"0.08em",cursor:"pointer",transition:"all 0.2s",position:"relative",zIndex:302}}
+            onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.06)";e.currentTarget.style.color="rgba(255,255,255,0.75)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.03)";e.currentTarget.style.color="rgba(255,255,255,0.5)";}}>SIGN IN</button>
+        </div>
       </div>
     </div>
   );
