@@ -347,7 +347,7 @@ const LoginScreen = React.memo(function LoginScreen({ onLogin }) {
     <PBtn onClick={doLogin} disabled={loading}>{loading?<><Spin/> SIGNING IN...</>:"SIGN IN →"}</PBtn>
     <div style={{marginTop:16,textAlign:"center",fontSize:12,fontFamily:SANS,color:"rgba(255,255,255,0.25)"}}>New here? <span onClick={()=>reset("register")} style={{color:"rgba(196,181,253,0.6)",cursor:"pointer",fontWeight:500}} onMouseEnter={e=>e.currentTarget.style.color="rgba(196,181,253,0.9)"} onMouseLeave={e=>e.currentTarget.style.color="rgba(196,181,253,0.6)"}>Create an account</span></div>
   </>);
-}
+});
 
 /* ── SubmitPanel ─────────────────────────────────────────── */
 function SubmitPanel({ user, students, onClose, onSubmit }) {
@@ -770,7 +770,7 @@ function App() {
 
       {!user&&<LoginScreen onLogin={handleLogin}/>}
 
-      <div style={{position:"relative",zIndex:1}}>
+      <div style={{position:"relative",zIndex:1,visibility:user?"visible":"hidden",pointerEvents:user?"auto":"none"}}>
         {/* NAV */}
         <div style={{borderBottom:"1px solid rgba(255,255,255,0.06)",padding:"0 32px",display:"flex",alignItems:"center",justifyContent:"space-between",backdropFilter:"blur(24px)",background:"rgba(8,8,16,0.7)",position:"sticky",top:0,zIndex:10,height:60}}>
           <div style={{display:"flex",alignItems:"center",gap:0}}>
