@@ -4,9 +4,9 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Tickers Leaderboard</title>
-<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.5/babel.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   *{margin:0;padding:0;box-sizing:border-box;}
@@ -635,6 +635,7 @@ function App() {
   const [newIds,      setNewIds]      = useState(new Set());
   const [activePage,  setActivePage]  = useState("leaderboard");
   const [appLoading,  setAppLoading]  = useState(true);
+  const [lastSync,    setLastSync]    = useState(null);
 
   useEffect(()=>{ const t=setInterval(()=>setTick(x=>x+1),60); return()=>clearInterval(t); },[]);
   const livePulse = Math.sin(tick*0.05)*0.4+0.6;
@@ -653,17 +654,41 @@ function App() {
 
   const fetchLeaderboard = async () => {
     const {data}=await SUPA.from('traders').select('*').order('pnl',{ascending:false});
-    if(data) setStudents(data.map(t=>computeStats({id:t.id,name:t.display_name,pic:t.avatar_url,pnl:t.pnl,trades:t.trades,wins:t.wins,hidePnl:t.hide_pnl})));
+    if(data){
+      const mapped = data.map(t=>computeStats({id:t.id,name:t.display_name,pic:t.avatar_url,pnl:t.pnl,trades:t.trades,wins:t.wins,hidePnl:t.hide_pnl}));
+      setStudents(prev=>{ setPrevStudents(prev); return mapped; });
+      setLastSync(new Date());
+    }
   };
+
   const fetchSessions = async () => {
     const {data}=await SUPA.from('sessions').select('*').order('submitted_at',{ascending:false});
     if(data) setSessions(data.map(s=>({...s,date:new Date(s.submitted_at).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})+" · "+new Date(s.submitted_at).toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"})})));
   };
 
   useEffect(()=>{
-    fetchLeaderboard(); fetchSessions();
-    const ch=SUPA.channel('traders-rt').on('postgres_changes',{event:'*',schema:'public',table:'traders'},fetchLeaderboard).subscribe();
-    return()=>SUPA.removeChannel(ch);
+    fetchLeaderboard();
+    fetchSessions();
+
+    /* ── Supabase Realtime on traders table ── */
+    const ch = SUPA.channel('traders-realtime')
+      .on('postgres_changes', { event:'*', schema:'public', table:'traders' }, () => {
+        fetchLeaderboard();
+      })
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'sessions' }, () => {
+        fetchSessions();
+      })
+      .subscribe((status) => {
+        console.log('Realtime status:', status);
+      });
+
+    /* ── Polling fallback every 2 seconds ── */
+    const poll = setInterval(()=>{
+      fetchLeaderboard();
+      fetchSessions();
+    }, 2000);
+
+    return()=>{ SUPA.removeChannel(ch); clearInterval(poll); };
   },[]);
 
   const ranked     = useMemo(()=>[...students].sort((a,b)=>b.pnl-a.pnl).map((s,i)=>({...s,rank:i+1})),[students]);
@@ -681,17 +706,34 @@ function App() {
   const handleSubmit = async (data) => {
     const uid=user.id;
     try {
-      /* upload screenshots */
+      /* upload screenshots to Supabase Storage */
       const proofUrls = await Promise.all(
-        data.proofs.map((p,i)=>uploadImg(p.preview,`proofs/${uid}/${Date.now()}-${i}.jpg`))
+        data.proofs.map(async (p,i) => {
+          const ext = p.file.type.includes('png') ? 'png' : 'jpg';
+          const path = `proofs/${uid}/${Date.now()}-${i}.${ext}`;
+          return await uploadImg(p.preview, path);
+        })
       );
-      /* current totals */
+      /* get current trader totals */
       const {data:cur}=await SUPA.from('traders').select('*').eq('id',uid).single();
-      setPrevStudents([...students]);
       /* update leaderboard row */
-      await SUPA.from('traders').update({pnl:cur.pnl+data.pnl,trades:cur.trades+data.trades,wins:cur.wins+data.wins,hide_pnl:data.hidePnl,updated_at:new Date().toISOString()}).eq('id',uid);
+      await SUPA.from('traders').update({
+        pnl:     cur.pnl    + data.pnl,
+        trades:  cur.trades + data.trades,
+        wins:    cur.wins   + data.wins,
+        hide_pnl: data.hidePnl,
+        updated_at: new Date().toISOString()
+      }).eq('id',uid);
       /* log session */
-      await SUPA.from('sessions').insert({user_id:uid,pnl:data.pnl,trades:data.trades,wins:data.wins,hide_pnl:data.hidePnl,proof_urls:proofUrls});
+      await SUPA.from('sessions').insert({
+        user_id:    uid,
+        pnl:        data.pnl,
+        trades:     data.trades,
+        wins:       data.wins,
+        hide_pnl:   data.hidePnl,
+        proof_urls: proofUrls,
+      });
+      await fetchLeaderboard();
       await fetchSessions();
       setShowSub(false);
       setToast({msg:"Session logged! 🎯"});
@@ -742,6 +784,7 @@ function App() {
           <div style={{display:"flex",alignItems:"center",gap:12}}>
             <div style={{display:"flex",alignItems:"center",gap:7,fontSize:11,fontFamily:MONO,letterSpacing:"0.07em",color:"rgba(52,211,153,0.9)"}}>
               <span style={{width:6,height:6,borderRadius:"50%",background:G,display:"inline-block",boxShadow:`0 0 ${4+livePulse*8}px ${G},0 0 ${8+livePulse*14}px ${G}55`}}/>LIVE
+              {lastSync&&<span style={{fontSize:9,color:"rgba(52,211,153,0.45)",letterSpacing:"0.04em"}}>{lastSync.toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}</span>}
             </div>
             {user&&<NavUserMenu user={user} onLogout={handleLogout} onSubmit={()=>setShowSub(true)}/>}
           </div>
