@@ -610,13 +610,20 @@ function PnlLogs({ user, sessions, onDeleteSession }) {
       </div>}
 
       {/* Delete session confirm */}
-      {confirmId&&<div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.75)",backdropFilter:"blur(12px)",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setConfirmId(null)}>
-        <div onClick={e=>e.stopPropagation()} style={{background:"#0e0e1c",border:"1px solid rgba(255,60,60,0.25)",borderRadius:20,padding:"28px",width:360,maxWidth:"90vw",boxShadow:"0 32px 64px rgba(0,0,0,0.6)",animation:"fadeIn 0.2s ease"}}>
-          <div style={{fontSize:18,fontWeight:700,fontFamily:SANS,color:"#fff",marginBottom:8}}>Delete this log?</div>
-          <div style={{fontSize:13,fontFamily:SANS,color:"rgba(255,255,255,0.4)",marginBottom:22,lineHeight:1.5}}>This session will be permanently removed and your leaderboard stats will be recalculated.</div>
+      {confirmId&&<div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.8)",backdropFilter:"blur(16px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}} onClick={()=>!deleting&&setConfirmId(null)}>
+        <div onClick={e=>e.stopPropagation()} style={{position:"relative",background:"linear-gradient(135deg,rgba(14,14,28,0.98),rgba(10,10,20,0.98))",border:"1px solid rgba(255,60,60,0.2)",borderRadius:24,padding:"32px",width:380,maxWidth:"92vw",boxShadow:"0 0 60px rgba(255,60,60,0.12),0 0 120px rgba(255,60,60,0.06),0 40px 80px rgba(0,0,0,0.7)",animation:"fadeIn 0.25s ease",overflow:"hidden",textAlign:"center"}}>
+          <div style={{position:"absolute",top:"-40px",right:"-40px",width:"140px",height:"140px",borderRadius:"50%",background:"radial-gradient(circle,rgba(255,60,60,0.15),transparent 65%)",pointerEvents:"none"}}/>
+          <div style={{position:"absolute",bottom:"-30px",left:"-30px",width:"110px",height:"110px",borderRadius:"50%",background:"radial-gradient(circle,rgba(255,60,60,0.08),transparent 65%)",pointerEvents:"none"}}/>
+          <div style={{width:50,height:50,borderRadius:14,background:"rgba(255,60,60,0.1)",border:"1px solid rgba(255,60,60,0.22)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 18px",boxShadow:"0 0 20px rgba(255,60,60,0.18)"}}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><polyline points="3,6 5,6 21,6" stroke="rgba(255,100,100,0.9)" strokeWidth="2" strokeLinecap="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="rgba(255,100,100,0.9)" strokeWidth="2" strokeLinecap="round"/><path d="M10 11v6M14 11v6" stroke="rgba(255,100,100,0.9)" strokeWidth="2" strokeLinecap="round"/></svg>
+          </div>
+          <div style={{fontSize:20,fontWeight:700,fontFamily:SANS,color:"#fff",marginBottom:9,letterSpacing:"-0.025em"}}>Delete this log?</div>
+          <div style={{fontSize:13,fontFamily:SANS,color:"rgba(255,255,255,0.38)",marginBottom:26,lineHeight:1.7}}>This session will be removed and your leaderboard stats will be recalculated automatically.</div>
           <div style={{display:"flex",gap:10}}>
-            <button onClick={()=>setConfirmId(null)} style={{flex:1,padding:"11px",borderRadius:10,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.09)",color:"rgba(255,255,255,0.5)",fontFamily:MONO,fontSize:12,fontWeight:700,cursor:"pointer"}}>CANCEL</button>
-            <button onClick={doDeleteSession} disabled={deleting} style={{flex:1,padding:"11px",borderRadius:10,background:"rgba(255,60,60,0.12)",border:"1px solid rgba(255,60,60,0.3)",color:"rgba(255,100,100,0.95)",fontFamily:MONO,fontSize:12,fontWeight:700,cursor:"pointer",opacity:deleting?0.7:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+            <button onClick={()=>setConfirmId(null)} disabled={deleting} style={{flex:1,padding:"12px",borderRadius:12,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.09)",color:"rgba(255,255,255,0.55)",fontFamily:MONO,fontSize:12,fontWeight:700,cursor:"pointer",transition:"all 0.2s"}}
+              onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.08)";e.currentTarget.style.color="#fff";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.04)";e.currentTarget.style.color="rgba(255,255,255,0.55)";}}>CANCEL</button>
+            <button onClick={doDeleteSession} disabled={deleting} style={{flex:1,padding:"12px",borderRadius:12,background:"rgba(255,60,60,0.15)",border:"1px solid rgba(255,60,60,0.35)",color:"rgba(255,110,110,0.95)",fontFamily:MONO,fontSize:12,fontWeight:700,cursor:deleting?"not-allowed":"pointer",opacity:deleting?0.7:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7,transition:"all 0.2s",boxShadow:"0 0 20px rgba(255,60,60,0.15)"}}
+              onMouseEnter={e=>{if(!deleting){e.currentTarget.style.background="rgba(255,60,60,0.25)";e.currentTarget.style.boxShadow="0 0 30px rgba(255,60,60,0.28)";}}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,60,60,0.15)";e.currentTarget.style.boxShadow="0 0 20px rgba(255,60,60,0.15)";}}>
               {deleting?<><Spin/> DELETING...</>:"DELETE"}
             </button>
           </div>
@@ -677,18 +684,22 @@ function NavUserMenu({ user, onLogout, onSubmit, onDeleteAccount }) {
       </div>
 
       {/* ── Delete Account Confirmation Modal ── */}
-      {confirmDel&&<div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.75)",backdropFilter:"blur(12px)",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setConfirmDel(false)}>
-        <div onClick={e=>e.stopPropagation()} style={{background:"#0e0e1c",border:"1px solid rgba(255,60,60,0.25)",borderRadius:20,padding:"32px",width:380,maxWidth:"90vw",boxShadow:"0 0 80px rgba(255,60,60,0.1),0 32px 64px rgba(0,0,0,0.6)",animation:"fadeIn 0.2s ease"}}>
-          <div style={{width:48,height:48,borderRadius:14,background:"rgba(255,60,60,0.1)",border:"1px solid rgba(255,60,60,0.2)",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:18}}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="rgba(255,100,100,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><line x1="12" y1="9" x2="12" y2="13" stroke="rgba(255,100,100,0.9)" strokeWidth="2" strokeLinecap="round"/><line x1="12" y1="17" x2="12.01" y2="17" stroke="rgba(255,100,100,0.9)" strokeWidth="2" strokeLinecap="round"/></svg>
+      {confirmDel&&<div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.8)",backdropFilter:"blur(16px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}} onClick={()=>!deleting&&setConfirmDel(false)}>
+        <div onClick={e=>e.stopPropagation()} style={{position:"relative",background:"linear-gradient(135deg,rgba(14,14,28,0.98),rgba(10,10,20,0.98))",border:"1px solid rgba(255,60,60,0.2)",borderRadius:24,padding:"36px",width:400,maxWidth:"92vw",boxShadow:"0 0 0 1px rgba(255,60,60,0.05),0 0 60px rgba(255,60,60,0.15),0 0 120px rgba(255,60,60,0.08),0 40px 80px rgba(0,0,0,0.7)",animation:"fadeIn 0.25s ease",overflow:"hidden",textAlign:"center"}}>
+          {/* orbs */}
+          <div style={{position:"absolute",top:"-40px",right:"-40px",width:"160px",height:"160px",borderRadius:"50%",background:"radial-gradient(circle,rgba(255,60,60,0.18),transparent 65%)",pointerEvents:"none"}}/>
+          <div style={{position:"absolute",bottom:"-30px",left:"-30px",width:"120px",height:"120px",borderRadius:"50%",background:"radial-gradient(circle,rgba(255,60,60,0.1),transparent 65%)",pointerEvents:"none"}}/>
+          {/* icon */}
+          <div style={{width:56,height:56,borderRadius:16,background:"rgba(255,60,60,0.1)",border:"1px solid rgba(255,60,60,0.25)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 20px",boxShadow:"0 0 24px rgba(255,60,60,0.2)"}}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><polyline points="3,6 5,6 21,6" stroke="rgba(255,100,100,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="rgba(255,100,100,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M10 11v6M14 11v6" stroke="rgba(255,100,100,0.9)" strokeWidth="2" strokeLinecap="round"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" stroke="rgba(255,100,100,0.9)" strokeWidth="2" strokeLinejoin="round"/></svg>
           </div>
-          <div style={{fontSize:20,fontWeight:700,fontFamily:SANS,color:"#fff",marginBottom:8,letterSpacing:"-0.02em"}}>Delete Account?</div>
-          <div style={{fontSize:13,fontFamily:SANS,color:"rgba(255,255,255,0.4)",lineHeight:1.6,marginBottom:24}}>This will permanently delete your account, leaderboard entry, and all PnL logs. <span style={{color:"rgba(255,100,100,0.7)",fontWeight:600}}>This cannot be undone.</span></div>
+          <div style={{fontSize:22,fontWeight:700,fontFamily:SANS,color:"#fff",marginBottom:10,letterSpacing:"-0.025em"}}>Delete Account?</div>
+          <div style={{fontSize:13,fontFamily:SANS,color:"rgba(255,255,255,0.38)",lineHeight:1.7,marginBottom:28}}>This will permanently delete your account, leaderboard entry, and all PnL logs.<br/><span style={{color:"rgba(255,100,100,0.8)",fontWeight:600}}>This cannot be undone.</span></div>
           <div style={{display:"flex",gap:10}}>
-            <button onClick={()=>setConfirmDel(false)} style={{flex:1,padding:"12px",borderRadius:11,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.09)",color:"rgba(255,255,255,0.5)",fontFamily:MONO,fontSize:12,fontWeight:700,letterSpacing:"0.06em",cursor:"pointer",transition:"all 0.2s"}}
-              onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.08)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.04)";}}>CANCEL</button>
-            <button onClick={doDelete} disabled={deleting} style={{flex:1,padding:"12px",borderRadius:11,background:"rgba(255,60,60,0.12)",border:"1px solid rgba(255,60,60,0.3)",color:"rgba(255,100,100,0.95)",fontFamily:MONO,fontSize:12,fontWeight:700,letterSpacing:"0.06em",cursor:"pointer",transition:"all 0.2s",opacity:deleting?0.7:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}
-              onMouseEnter={e=>{if(!deleting)e.currentTarget.style.background="rgba(255,60,60,0.22)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,60,60,0.12)";}}>
+            <button onClick={()=>setConfirmDel(false)} disabled={deleting} style={{flex:1,padding:"13px",borderRadius:12,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.09)",color:"rgba(255,255,255,0.55)",fontFamily:MONO,fontSize:12,fontWeight:700,letterSpacing:"0.06em",cursor:"pointer",transition:"all 0.2s"}}
+              onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.08)";e.currentTarget.style.color="#fff";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.04)";e.currentTarget.style.color="rgba(255,255,255,0.55)";}}>CANCEL</button>
+            <button onClick={doDelete} disabled={deleting} style={{flex:1,padding:"13px",borderRadius:12,background:"rgba(255,60,60,0.15)",border:"1px solid rgba(255,60,60,0.35)",color:"rgba(255,110,110,0.95)",fontFamily:MONO,fontSize:12,fontWeight:700,letterSpacing:"0.06em",cursor:deleting?"not-allowed":"pointer",transition:"all 0.2s",opacity:deleting?0.7:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7,boxShadow:"0 0 20px rgba(255,60,60,0.15)"}}
+              onMouseEnter={e=>{if(!deleting){e.currentTarget.style.background="rgba(255,60,60,0.25)";e.currentTarget.style.boxShadow="0 0 30px rgba(255,60,60,0.3)";}}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,60,60,0.15)";e.currentTarget.style.boxShadow="0 0 20px rgba(255,60,60,0.15)";}}>
               {deleting?<><Spin/> DELETING...</>:"YES, DELETE"}
             </button>
           </div>
@@ -773,30 +784,38 @@ function App() {
   const handleDeleteAccount = async () => {
     try {
       const uid = user.id;
+      // Delete all sessions
       await SUPA.from('sessions').delete().eq('user_id', uid);
+      // Delete trader row
       await SUPA.from('traders').delete().eq('id', uid);
+      // Delete profile
       await SUPA.from('profiles').delete().eq('id', uid);
+      // Delete auth user via secure server-side function
+      await SUPA.rpc('delete_own_account');
+      // Sign out
       await SUPA.auth.signOut();
       setUser(null);
+      setStudents(prev => prev.filter(s => s.id !== uid));
       setActivePage("leaderboard");
-      await fetchLeaderboard();
       setToast({msg:"Account deleted."});
     } catch(e) { setToast({msg:e.message||"Delete failed.",isError:true}); }
   };
 
   const handleDeleteSession = async (sessionId) => {
     try {
-      await SUPA.from('sessions').delete().eq('id', sessionId);
+      const {error} = await SUPA.from('sessions').delete().eq('id', sessionId);
+      if(error) throw error;
       // Recalculate trader totals from remaining sessions
-      const {data:remaining} = await SUPA.from('sessions').select('*').eq('user_id', user.id);
-      const pnl   = remaining.reduce((a,s)=>a+s.pnl,0);
-      const trades= remaining.reduce((a,s)=>a+s.trades,0);
-      const wins  = remaining.reduce((a,s)=>a+s.wins,0);
+      const {data:remaining, error:fetchErr} = await SUPA.from('sessions').select('*').eq('user_id', user.id);
+      if(fetchErr) throw fetchErr;
+      const pnl   = (remaining||[]).reduce((a,s)=>a+(s.pnl||0),0);
+      const trades= (remaining||[]).reduce((a,s)=>a+(s.trades||0),0);
+      const wins  = (remaining||[]).reduce((a,s)=>a+(s.wins||0),0);
       await SUPA.from('traders').update({pnl,trades,wins}).eq('id',user.id);
       await fetchLeaderboard();
       await fetchSessions();
       setToast({msg:"Session deleted."});
-    } catch(e) { setToast({msg:e.message||"Delete failed.",isError:true}); }
+    } catch(e) { console.error("Delete session error:",e); setToast({msg:e.message||"Delete failed.",isError:true}); }
   };
 
   const handleSubmit = async (data) => {
