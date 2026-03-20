@@ -192,7 +192,7 @@ function InputField({ label, value, onChange, placeholder, type="text", onEnter 
 }
 
 /* ── LoginScreen ─────────────────────────────────────────── */
-function LoginScreen({ onLogin }) {
+const LoginScreen = React.memo(function LoginScreen({ onLogin }) {
   const [mode,setMode]         = useState("choose");
   const [username,setUsername] = useState("");
   const [email,setEmail]       = useState("");
@@ -696,11 +696,10 @@ function App() {
         console.log('Realtime status:', status);
       });
 
-    /* ── Polling fallback every 2 seconds ── */
+    /* ── Polling fallback every 30 seconds (only after login) ── */
     const poll = setInterval(()=>{
       fetchLeaderboard();
-      fetchSessions();
-    }, 2000);
+    }, 30000);
 
     return()=>{ SUPA.removeChannel(ch); clearInterval(poll); };
   },[]);
@@ -710,11 +709,10 @@ function App() {
   const totals     = useMemo(()=>({pnl:students.reduce((a,x)=>a+x.pnl,0),wr:students.length?students.reduce((a,x)=>a+x.winRate,0)/students.length:0,trades:students.reduce((a,x)=>a+x.trades,0),active:students.length}),[students]);
   const myCount    = user?sessions.filter(s=>s.user_id===user.id).length:0;
 
-  const handleLogin = u => {
+  const handleLogin = React.useCallback(u => {
     setUser(u); setToast({msg:`Welcome, ${u.name}!`});
-    if(!students.find(s=>s.id===u.id)){ setNewIds(s=>{const n=new Set(s);n.add(u.id);return n;}); setTimeout(()=>setNewIds(s=>{const n=new Set(s);n.delete(u.id);return n;}),800); }
     fetchLeaderboard(); fetchSessions();
-  };
+  }, []);
   const handleLogout = async () => { await SUPA.auth.signOut(); setUser(null); setActivePage("leaderboard"); };
 
   const handleSubmit = async (data) => {
