@@ -138,11 +138,11 @@ function StatCard({ label, val, color, glow }) {
   const gc = glow||"rgba(139,92,246,";
   return (
     <div className="stat-card" onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
-      style={{background:hov?"rgba(255,255,255,0.045)":"rgba(255,255,255,0.02)",border:`1px solid ${hov?(glow?glow+"55":"rgba(139,92,246,0.4)"):"rgba(255,255,255,0.06)"}`,borderRadius:20,padding:"22px 24px",position:"relative",overflow:"hidden",cursor:"default",
+      style={{background:hov?"rgba(255,255,255,0.045)":"rgba(255,255,255,0.02)",border:`1px solid ${hov?(glow?glow+"55":"rgba(139,92,246,0.4)"):"rgba(255,255,255,0.06)"}`,borderRadius:16,padding:"16px 20px",position:"relative",overflow:"hidden",cursor:"default",
         boxShadow:hov?`0 0 50px ${gc}0.2),0 20px 40px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.06)`:"0 4px 20px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.03)"}}>
       <div style={{position:"absolute",top:-60,right:-60,width:140,height:140,borderRadius:"50%",background:glow?`radial-gradient(circle,${glow}33,transparent 65%)`:"radial-gradient(circle,rgba(139,92,246,0.15),transparent 65%)",filter:"blur(20px)",opacity:hov?1:0.4,transition:"opacity 0.3s",pointerEvents:"none"}}/>
-      <div style={{fontSize:9,fontFamily:MONO,color:"rgba(255,255,255,0.25)",marginBottom:12,letterSpacing:"0.14em",position:"relative",textTransform:"uppercase"}}>{label}</div>
-      <div style={{fontSize:28,fontWeight:700,fontFamily:MONO,position:"relative",color:color||(hov?"#fff":"rgba(255,255,255,0.9)"),
+      <div style={{fontSize:8,fontFamily:MONO,color:"rgba(255,255,255,0.25)",marginBottom:8,letterSpacing:"0.14em",position:"relative",textTransform:"uppercase"}}>{label}</div>
+      <div style={{fontSize:24,fontWeight:700,fontFamily:MONO,position:"relative",color:color||(hov?"#fff":"rgba(255,255,255,0.9)"),
         textShadow:hov?`0 0 30px ${glow||"rgba(139,92,246,0.9)"}`:glow?`0 0 20px ${glow}66`:"none",transition:"all 0.3s",letterSpacing:"-0.02em"}}>{val}</div>
     </div>
   );
@@ -969,43 +969,63 @@ function App() {
         {/* PAGE */}
         {activePage==="pnllogs"&&user
           ?<PnlLogs user={user} sessions={sessions} onDeleteSession={handleDeleteSession}/>
-          :<div style={{padding:"28px 24px 40px",maxWidth:1060,margin:"0 auto"}}>
-            <div style={{marginBottom:"1.5rem",animation:"fadeIn 0.5s ease",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
+          :<div style={{padding:"20px 24px 32px",maxWidth:1060,margin:"0 auto"}}>
+            {/* Header row */}
+            <div style={{marginBottom:"1.2rem",animation:"fadeIn 0.5s ease",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
               <div>
-                <h1 style={{margin:0,fontSize:"clamp(28px,4vw,44px)",fontWeight:800,fontFamily:SANS,letterSpacing:"-0.04em",lineHeight:1.0,color:"rgba(255,255,255,0.95)"}}>Leaderboard</h1>
-                <p style={{margin:"6px 0 0",fontSize:10,fontFamily:MONO,color:"rgba(255,255,255,0.18)",letterSpacing:"0.1em"}}>TOP DAY TRADERS · RANKED BY P&L · REAL-TIME</p>
+                <h1 style={{margin:0,fontSize:"clamp(26px,3.5vw,40px)",fontWeight:800,fontFamily:SANS,letterSpacing:"-0.04em",lineHeight:1,color:"rgba(255,255,255,0.95)"}}>Leaderboard</h1>
+                <p style={{margin:"4px 0 0",fontSize:9,fontFamily:MONO,color:"rgba(255,255,255,0.16)",letterSpacing:"0.12em"}}>TOP DAY TRADERS · RANKED BY P&L · REAL-TIME</p>
               </div>
-              {/* Time filter */}
-              <div style={{display:"flex",gap:4,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,padding:4}}>
+              {/* Time filter — spring pop + glow on hover */}
+              <div style={{display:"flex",gap:3,background:"rgba(255,255,255,0.025)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:11,padding:3}}>
                 {[{id:"today",label:"Today"},{id:"week",label:"Week"},{id:"month",label:"Month"},{id:"all",label:"All Time"}].map(f=>{
                   const active=timeFilter===f.id;
                   return <button key={f.id} onClick={()=>setTimeFilter(f.id)}
-                    style={{padding:"7px 13px",borderRadius:9,border:"none",background:active?"rgba(139,92,246,0.22)":"transparent",color:active?"rgba(196,181,253,1)":"rgba(255,255,255,0.35)",fontFamily:MONO,fontSize:11,fontWeight:700,letterSpacing:"0.05em",cursor:"pointer",transition:"all 0.2s",boxShadow:active?"0 0 18px rgba(139,92,246,0.25),inset 0 1px 0 rgba(255,255,255,0.07)":"none",outline:active?"1px solid rgba(139,92,246,0.4)":"none",whiteSpace:"nowrap"}}
-                    onMouseEnter={e=>{if(!active){e.currentTarget.style.color="rgba(255,255,255,0.75)";e.currentTarget.style.background="rgba(255,255,255,0.06)";}}}
-                    onMouseLeave={e=>{if(!active){e.currentTarget.style.color="rgba(255,255,255,0.35)";e.currentTarget.style.background="transparent";}}}>
+                    style={{padding:"6px 12px",borderRadius:8,border:"none",
+                      background:active?"linear-gradient(135deg,rgba(139,92,246,0.28),rgba(99,102,241,0.18))":"transparent",
+                      color:active?"rgba(196,181,253,1)":"rgba(255,255,255,0.3)",
+                      fontFamily:MONO,fontSize:10,fontWeight:700,letterSpacing:"0.05em",cursor:"pointer",
+                      transition:"all 0.18s cubic-bezier(0.34,1.56,0.64,1)",
+                      boxShadow:active?"0 0 20px rgba(139,92,246,0.3),inset 0 1px 0 rgba(255,255,255,0.1)":"none",
+                      outline:"none",whiteSpace:"nowrap",
+                      transform:"scale(1)"}}
+                    onMouseEnter={e=>{if(!active){
+                      e.currentTarget.style.color="rgba(196,181,253,0.85)";
+                      e.currentTarget.style.background="rgba(139,92,246,0.12)";
+                      e.currentTarget.style.transform="scale(1.08)";
+                      e.currentTarget.style.boxShadow="0 0 16px rgba(139,92,246,0.2)";
+                    }}}
+                    onMouseLeave={e=>{if(!active){
+                      e.currentTarget.style.color="rgba(255,255,255,0.3)";
+                      e.currentTarget.style.background="transparent";
+                      e.currentTarget.style.transform="scale(1)";
+                      e.currentTarget.style.boxShadow="none";
+                    }}}>
                     {f.label}
                   </button>;
                 })}
               </div>
             </div>
-            <div className="stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:"1.5rem"}}>
+            {/* Stat cards */}
+            <div className="stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:"1.2rem"}}>
               <StatCard label="ACTIVE TRADERS" val={String(totals.active)}/>
               <StatCard label="TOTAL P&L"      val={fmt(totals.pnl)}  color={totals.pnl>=0?G:R} glow={totals.pnl>=0?G:R}/>
               <StatCard label="AVG WIN RATE"   val={pct(totals.wr)}/>
               <StatCard label="TOTAL TRADES"   val={String(totals.trades)}/>
             </div>
-            <div style={{border:"1px solid rgba(255,255,255,0.07)",borderRadius:16,overflow:"hidden",background:"rgba(10,8,22,0.85)"}}>
-              <div style={{display:"grid",gridTemplateColumns:"44px 1fr 120px 95px 70px 110px",padding:"10px 20px",borderBottom:"1px solid rgba(255,255,255,0.05)",fontFamily:MONO,fontSize:9,color:"rgba(255,255,255,0.18)",letterSpacing:"0.12em"}}>
+            {/* Table */}
+            <div style={{border:"1px solid rgba(255,255,255,0.07)",borderRadius:14,overflow:"hidden",background:"rgba(10,8,22,0.9)"}}>
+              <div style={{display:"grid",gridTemplateColumns:"44px 1fr 120px 95px 70px 110px",padding:"9px 18px",borderBottom:"1px solid rgba(255,255,255,0.05)",fontFamily:MONO,fontSize:9,color:"rgba(255,255,255,0.16)",letterSpacing:"0.12em"}}>
                 <span>#</span><span>TRADER</span><span style={{textAlign:"right"}}>P&L</span><span style={{textAlign:"right"}}>WIN %</span><span style={{textAlign:"right"}}>TRADES</span><span style={{textAlign:"right"}}>AVG RET</span>
               </div>
               {ranked.map((t,i)=>{
                 const prev=prevRanked.find(p=>p.id===t.id);
                 return <TraderRow key={t.id} t={t} prev={prev} isNew={newIds.has(t.id)} isSelected={selected?.id===t.id} onClick={()=>setSelected(selected?.id===t.id?null:t)} isLast={i===ranked.length-1}/>;
               })}
-              {ranked.length===0&&<div style={{padding:"48px 24px",textAlign:"center",fontFamily:MONO,fontSize:11,color:"rgba(255,255,255,0.12)",letterSpacing:"0.1em"}}>NO TRADERS YET · BE THE FIRST</div>}
+              {ranked.length===0&&<div style={{padding:"40px 24px",textAlign:"center",fontFamily:MONO,fontSize:11,color:"rgba(255,255,255,0.1)",letterSpacing:"0.1em"}}>NO TRADERS YET · BE THE FIRST</div>}
             </div>
-            <div style={{marginTop:14,padding:"0 2px"}}>
-              <span style={{fontSize:10,fontFamily:MONO,color:"rgba(255,255,255,0.22)",letterSpacing:"0.08em"}}>{ranked.length} TRADER{ranked.length!==1?"S":""}</span>
+            <div style={{marginTop:10,padding:"0 2px"}}>
+              <span style={{fontSize:9,fontFamily:MONO,color:"rgba(255,255,255,0.18)",letterSpacing:"0.1em"}}>{ranked.length} TRADER{ranked.length!==1?"S":""}</span>
             </div>
           </div>
         }
