@@ -1241,7 +1241,7 @@ function App() {
               <StatCard label="TOTAL P&L"      val={fmt(totals.pnl)}  color={totals.pnl>=0?G:R} glow={totals.pnl>=0?G:R}/>
               <StatCard label="AVG WIN RATE"   val={pct(totals.wr)}/>
               <StatCard label="TOTAL TRADES"   val={String(totals.trades)}/>
-              <StatCard label="RR MADE"        val={totals.rr>0?totals.rr.toFixed(1)+"R":"—"} color={totals.rr>0?"rgba(196,181,253,0.9)":undefined} glow={totals.rr>0?"rgba(139,92,246,":undefined}/>
+              <StatCard label="RR MADE" val={totals.rr>0?totals.rr.toFixed(1)+"R":"—"}/>
             </div>
             {/* Table */}
             <div style={{border:"1px solid rgba(255,255,255,0.07)",borderRadius:16,overflow:"hidden",background:"rgba(10,8,22,0.9)"}}>
