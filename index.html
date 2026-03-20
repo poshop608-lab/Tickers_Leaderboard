@@ -1060,6 +1060,8 @@ function App() {
       setToast({msg:"User deleted."});
     } catch(e) { setToast({msg:e.message||"Delete failed.",isError:true}); }
   };
+
+  const handleSubmit = async (data) => {
     const uid=user.id;
     try {
       /* upload screenshots to Supabase Storage */
