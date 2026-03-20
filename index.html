@@ -221,8 +221,8 @@ function TraderRow({ t, prev, isSelected, onClick, isLast, isNew }) {
         <div className="hide-col" style={{textAlign:"right",display:"flex",alignItems:"center",justifyContent:"flex-end"}}>
           {t.rrMade>0
             ?<span style={{fontFamily:MONO,fontSize:12,fontWeight:700,
-                color:t.rrMade>=3?"rgba(167,139,250,1)":t.rrMade>=2?"rgba(196,181,253,0.9)":"rgba(253,230,138,0.8)",
-                textShadow:t.rrMade>=2?`0 0 ${hov?16:8}px rgba(167,139,250,${hov?"0.8":"0.4"})`:"none",
+                color:t.rrMade>=3?"rgba(196,181,253,0.95)":t.rrMade>=2?"rgba(196,181,253,0.8)":"rgba(253,230,138,0.75)",
+                textShadow:hov?`0 0 10px rgba(139,92,246,0.5)`:"none",
                 transition:"text-shadow 0.2s"}}>{t.rrMade.toFixed(1)}R</span>
             :<span style={{fontFamily:MONO,fontSize:12,color:"rgba(255,255,255,0.15)"}}>—</span>
           }
@@ -1241,7 +1241,7 @@ function App() {
               <StatCard label="TOTAL P&L"      val={fmt(totals.pnl)}  color={totals.pnl>=0?G:R} glow={totals.pnl>=0?G:R}/>
               <StatCard label="AVG WIN RATE"   val={pct(totals.wr)}/>
               <StatCard label="TOTAL TRADES"   val={String(totals.trades)}/>
-              <StatCard label="RR MADE"        val={totals.rr>0?totals.rr.toFixed(1)+"R":"—"} color="rgba(167,139,250,0.95)" glow="rgba(167,139,250,"/>
+              <StatCard label="RR MADE"        val={totals.rr>0?totals.rr.toFixed(1)+"R":"—"} color={totals.rr>0?"rgba(196,181,253,0.9)":undefined} glow={totals.rr>0?"rgba(139,92,246,":undefined}/>
             </div>
             {/* Table */}
             <div style={{border:"1px solid rgba(255,255,255,0.07)",borderRadius:16,overflow:"hidden",background:"rgba(10,8,22,0.9)"}}>
