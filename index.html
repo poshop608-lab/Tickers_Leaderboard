@@ -10,20 +10,48 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   *{margin:0;padding:0;box-sizing:border-box;}
-  body{background:#080810;min-height:100vh;color:#fff;}
-  @keyframes floatUp{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-16px)}}
-  @keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+  body{background:#05050f;min-height:100vh;color:#fff;}
+
+  @keyframes floatUp{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-20px)}}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes fadeInScale{from{opacity:0;transform:scale(0.94)}to{opacity:1;transform:scale(1)}}
   @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
   @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes pulseGlow{0%,100%{opacity:0.5;transform:scale(1)}50%{opacity:1;transform:scale(1.08)}}
+  @keyframes orbFloat{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-18px) scale(1.04)}}
+  @keyframes shimmer{0%{background-position:-200% center}100%{background-position:200% center}}
+  @keyframes borderGlow{0%,100%{box-shadow:0 0 20px rgba(139,92,246,0.3),0 0 60px rgba(139,92,246,0.1)}50%{box-shadow:0 0 40px rgba(139,92,246,0.6),0 0 100px rgba(139,92,246,0.2)}}
+
   input[type=number]{-moz-appearance:textfield;}
   input[type=number]::-webkit-outer-spin-button,
   input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
-  input::placeholder{color:rgba(255,255,255,0.18);}
-  ::-webkit-scrollbar{width:3px;}
+  input::placeholder{color:rgba(255,255,255,0.15);}
+  input:-webkit-autofill{-webkit-box-shadow:0 0 0 100px #0d0d1f inset!important;-webkit-text-fill-color:#fff!important;}
+
+  ::-webkit-scrollbar{width:4px;}
   ::-webkit-scrollbar-track{background:transparent;}
-  ::-webkit-scrollbar-thumb{background:rgba(167,139,250,0.2);border-radius:4px;}
-  .row-enter{animation:fadeIn 0.4s ease forwards;}
-  .panel-enter{animation:slideIn 0.35s cubic-bezier(0.16,1,0.3,1) forwards;}
+  ::-webkit-scrollbar-thumb{background:rgba(139,92,246,0.25);border-radius:4px;}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(139,92,246,0.5);}
+
+  .row-enter{animation:fadeIn 0.5s cubic-bezier(0.16,1,0.3,1) forwards;}
+  .panel-enter{animation:slideIn 0.4s cubic-bezier(0.16,1,0.3,1) forwards;}
+  .modal-enter{animation:fadeInScale 0.28s cubic-bezier(0.16,1,0.3,1) forwards;}
+
+  .glow-text{
+    background:linear-gradient(135deg,#c4b5fd 0%,#a78bfa 40%,#818cf8 100%);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  }
+  .stat-card{transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);}
+  .stat-card:hover{transform:translateY(-4px) scale(1.02);}
+  .trader-row{transition:background 0.2s ease;}
+
+  @media(max-width:768px){
+    .stat-grid{grid-template-columns:repeat(2,1fr)!important;}
+    .leaderboard-grid{grid-template-columns:"44px 1fr 100px 80px"!important;}
+    .hide-mobile{display:none!important;}
+    .page-pad{padding:24px 16px!important;}
+    .filter-wrap{flex-direction:column!important;align-items:flex-start!important;}
+  }
 </style>
 </head>
 <body>
@@ -43,9 +71,9 @@
 <script type="text/babel">
 const { useState, useMemo, useEffect, useRef } = React;
 
-const MONO = "'SF Mono','Fira Code','Courier New',monospace";
-const SANS = "'SF Pro Display','-apple-system','BlinkMacSystemFont','Helvetica Neue','Inter',sans-serif";
-const G = "#34d399", R = "#fb7185";
+const MONO = "'SF Mono','Fira Code','JetBrains Mono','Courier New',monospace";
+const SANS = "'SF Pro Display','system-ui','-apple-system','Helvetica Neue',sans-serif";
+const G = "#34d399", R = "#fb7185", P = "#a78bfa";
 
 const fmt    = v => { const a=Math.abs(v),s=v>=0?"+":"-"; return a>=1000?`${s}$${(a/1e3).toFixed(1)}k`:`${s}$${a.toFixed(0)}`; };
 const fmtAvg = v => { const a=Math.abs(v),s=v>=0?"+":"-"; return a>=1000?`${s}$${(a/1e3).toFixed(1)}k`:`${s}$${a.toFixed(0)}`; };
@@ -107,11 +135,15 @@ function PrivacyBadge({ name }) {
 /* ── StatCard ────────────────────────────────────────────── */
 function StatCard({ label, val, color, glow }) {
   const [hov,setHov]=useState(false);
+  const gc = glow||"rgba(139,92,246,";
   return (
-    <div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)} style={{background:hov?"rgba(255,255,255,0.05)":"rgba(255,255,255,0.025)",border:`1px solid ${hov?(glow?glow+"66":"rgba(167,139,250,0.35)"):"rgba(255,255,255,0.07)"}`,borderRadius:18,padding:"22px 24px",position:"relative",overflow:"hidden",backdropFilter:"blur(10px)",cursor:"default",boxShadow:hov?`0 0 40px ${glow||"rgba(167,139,250,"}${glow?"33":"0.12)"},0 8px 32px rgba(0,0,0,0.3)`:"0 2px 12px rgba(0,0,0,0.2)",transform:hov?"translateY(-3px) scale(1.02)":"translateY(0) scale(1)",transition:"all 0.25s cubic-bezier(0.34,1.56,0.64,1)"}}>
-      <div style={{position:"absolute",top:-50,right:-50,width:120,height:120,borderRadius:"50%",background:glow?`${glow}22`:"rgba(167,139,250,0.08)",filter:"blur(30px)",opacity:hov?1:0.3,transition:"opacity 0.3s"}}/>
-      <div style={{fontSize:9,fontFamily:MONO,color:"rgba(255,255,255,0.3)",marginBottom:10,letterSpacing:"0.12em",position:"relative"}}>{label}</div>
-      <div style={{fontSize:30,fontWeight:700,fontFamily:MONO,position:"relative",color:color||(hov?"#fff":"rgba(255,255,255,0.88)"),textShadow:hov?`0 0 24px ${glow||"rgba(167,139,250,0.9)"}`:glow?`0 0 14px ${glow}55`:"none",transition:"all 0.25s"}}>{val}</div>
+    <div className="stat-card" onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+      style={{background:hov?"rgba(255,255,255,0.045)":"rgba(255,255,255,0.02)",border:`1px solid ${hov?(glow?glow+"55":"rgba(139,92,246,0.4)"):"rgba(255,255,255,0.06)"}`,borderRadius:20,padding:"22px 24px",position:"relative",overflow:"hidden",cursor:"default",
+        boxShadow:hov?`0 0 50px ${gc}0.2),0 20px 40px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.06)`:"0 4px 20px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.03)"}}>
+      <div style={{position:"absolute",top:-60,right:-60,width:140,height:140,borderRadius:"50%",background:glow?`radial-gradient(circle,${glow}33,transparent 65%)`:"radial-gradient(circle,rgba(139,92,246,0.15),transparent 65%)",filter:"blur(20px)",opacity:hov?1:0.4,transition:"opacity 0.3s",pointerEvents:"none"}}/>
+      <div style={{fontSize:9,fontFamily:MONO,color:"rgba(255,255,255,0.25)",marginBottom:12,letterSpacing:"0.14em",position:"relative",textTransform:"uppercase"}}>{label}</div>
+      <div style={{fontSize:28,fontWeight:700,fontFamily:MONO,position:"relative",color:color||(hov?"#fff":"rgba(255,255,255,0.9)"),
+        textShadow:hov?`0 0 30px ${glow||"rgba(139,92,246,0.9)"}`:glow?`0 0 20px ${glow}66`:"none",transition:"all 0.3s",letterSpacing:"-0.02em"}}>{val}</div>
     </div>
   );
 }
@@ -126,12 +158,12 @@ function TraderRow({ t, prev, isSelected, onClick, isLast, isNew }) {
   return (
     <div className={isNew?"row-enter":""}>
       <div onClick={onClick} onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
-        style={{display:"grid",gridTemplateColumns:"52px 1fr 140px 110px 80px 130px",padding:"15px 24px",cursor:"pointer",borderBottom:isLast?"none":"1px solid rgba(255,255,255,0.04)",background:isSelected?"rgba(167,139,250,0.06)":hov?"rgba(255,255,255,0.025)":"transparent",transition:"background 0.2s",position:"relative"}}>
+        style={{display:"grid",gridTemplateColumns:"44px 1fr 120px 95px 70px 110px",padding:"14px 20px",cursor:"pointer",borderBottom:isLast?"none":"1px solid rgba(255,255,255,0.04)",background:isSelected?"rgba(139,92,246,0.07)":hov?"rgba(255,255,255,0.028)":"transparent",transition:"background 0.2s",position:"relative"}}>
         {hov&&<>
-          <div style={{position:"absolute",left:0,right:0,top:0,height:"1px",background:"linear-gradient(90deg,transparent,rgba(167,139,250,0.5),rgba(99,179,237,0.3),transparent)"}}/>
-          <div style={{position:"absolute",left:0,right:0,bottom:0,height:"1px",background:"linear-gradient(90deg,transparent,rgba(167,139,250,0.15),transparent)"}}/>
+          <div style={{position:"absolute",left:0,right:0,top:0,height:"1px",background:"linear-gradient(90deg,transparent,rgba(139,92,246,0.5),rgba(99,102,241,0.3),transparent)"}}/>
+          <div style={{position:"absolute",left:0,right:0,bottom:0,height:"1px",background:"linear-gradient(90deg,transparent,rgba(139,92,246,0.15),transparent)"}}/>
         </>}
-        {t.rank===1&&<div style={{position:"absolute",left:0,top:"15%",bottom:"15%",width:2,borderRadius:2,background:"rgba(167,139,250,0.8)",boxShadow:"0 0 8px rgba(167,139,250,0.7)"}}/>}
+        {t.rank===1&&<div style={{position:"absolute",left:0,top:"15%",bottom:"15%",width:2,borderRadius:2,background:"rgba(139,92,246,0.9)",boxShadow:"0 0 10px rgba(139,92,246,0.8)"}}/>}
         <div style={{display:"flex",alignItems:"center",gap:4}}>
           {ri(t.rank)?<span style={{fontSize:20}}>{ri(t.rank)}</span>:<span style={{fontFamily:MONO,fontSize:12,color:rankAnim?"rgba(167,139,250,0.9)":"rgba(255,255,255,0.25)",textShadow:rankAnim?"0 0 12px rgba(167,139,250,0.8)":"none",transition:"all 0.4s",fontWeight:500}}>{t.rank}</span>}
           {rankDiff>0&&<span style={{fontSize:9,color:G,fontFamily:MONO,animation:"floatUp 1.4s ease forwards"}}>▲{rankDiff}</span>}
@@ -271,33 +303,45 @@ const LoginScreen = React.memo(function LoginScreen({ onLogin }) {
   };
 
   const BG = <>
-    <div style={{position:"absolute",top:"-15%",left:"-10%",width:"50vw",height:"50vw",borderRadius:"50%",background:"radial-gradient(circle,rgba(167,139,250,0.12),transparent 65%)",pointerEvents:"none"}}/>
-    <div style={{position:"absolute",bottom:"-10%",right:"-5%",width:"40vw",height:"40vw",borderRadius:"50%",background:"radial-gradient(circle,rgba(99,179,237,0.08),transparent 65%)",pointerEvents:"none"}}/>
+    <div style={{position:"fixed",top:"-20%",left:"-10%",width:"55vw",height:"55vw",borderRadius:"50%",background:"radial-gradient(circle,rgba(139,92,246,0.18),transparent 60%)",pointerEvents:"none",animation:"orbFloat 10s ease-in-out infinite"}}/>
+    <div style={{position:"fixed",bottom:"-15%",right:"-8%",width:"45vw",height:"45vw",borderRadius:"50%",background:"radial-gradient(circle,rgba(99,102,241,0.12),transparent 60%)",pointerEvents:"none",animation:"orbFloat 13s ease-in-out infinite reverse"}}/>
+    <div style={{position:"fixed",top:"40%",right:"20%",width:"25vw",height:"25vw",borderRadius:"50%",background:"radial-gradient(circle,rgba(52,211,153,0.06),transparent 60%)",pointerEvents:"none",animation:"orbFloat 7s ease-in-out infinite"}}/>
   </>;
-  const card = {position:"relative",width:420,maxWidth:"100%",background:"linear-gradient(145deg,rgba(16,14,32,0.99),rgba(10,10,22,0.99))",border:"1px solid rgba(167,139,250,0.12)",borderRadius:24,padding:"2.25rem",boxShadow:"0 0 0 1px rgba(167,139,250,0.04),0 0 60px rgba(167,139,250,0.1),0 0 120px rgba(167,139,250,0.05),0 40px 80px rgba(0,0,0,0.6)",animation:"fadeIn 0.35s ease"};
+  const card = {position:"relative",width:420,maxWidth:"100%",
+    background:"linear-gradient(145deg,rgba(13,11,28,0.98),rgba(8,8,20,0.99))",
+    border:"1px solid rgba(139,92,246,0.2)",
+    borderRadius:28,padding:"2.5rem",
+    boxShadow:"0 0 0 1px rgba(139,92,246,0.06),0 0 80px rgba(139,92,246,0.15),0 0 160px rgba(139,92,246,0.06),inset 0 1px 0 rgba(255,255,255,0.06),0 50px 100px rgba(0,0,0,0.7)",
+    animation:"fadeInScale 0.35s cubic-bezier(0.16,1,0.3,1)"};
   const Logo = () => (
-    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:"2rem"}}>
-      <div style={{width:34,height:34,borderRadius:9,background:"rgba(167,139,250,0.1)",border:"1px solid rgba(167,139,250,0.22)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 0 18px rgba(167,139,250,0.2)"}}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><polygon points="12,2 22,20 2,20" fill="none" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinejoin="round"/><polygon points="12,7 18,20 6,20" fill="rgba(196,181,253,0.18)" strokeLinejoin="round"/></svg>
+    <div style={{display:"flex",alignItems:"center",gap:11,marginBottom:"2.2rem"}}>
+      <div style={{width:38,height:38,borderRadius:12,background:"linear-gradient(135deg,rgba(139,92,246,0.2),rgba(99,102,241,0.1))",border:"1px solid rgba(139,92,246,0.35)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 0 24px rgba(139,92,246,0.3),inset 0 1px 0 rgba(255,255,255,0.1)"}}>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><polygon points="12,2 22,20 2,20" fill="none" stroke="rgba(196,181,253,0.95)" strokeWidth="2" strokeLinejoin="round"/><polygon points="12,7 18,20 6,20" fill="rgba(196,181,253,0.2)" strokeLinejoin="round"/></svg>
       </div>
-      <span style={{fontWeight:700,fontSize:13,letterSpacing:"0.13em",color:"rgba(255,255,255,0.9)",fontFamily:MONO,textShadow:"0 0 16px rgba(196,181,253,0.4)"}}>TICKERS</span>
+      <span style={{fontWeight:800,fontSize:14,letterSpacing:"0.16em",color:"rgba(255,255,255,0.95)",fontFamily:MONO,textShadow:"0 0 20px rgba(196,181,253,0.5)"}}>TICKERS</span>
     </div>
   );
   const PBtn = ({ onClick, disabled, children }) => (
-    <button onClick={e=>{e.stopPropagation();if(!disabled)onClick();}} disabled={disabled} style={{width:"100%",padding:"14px",marginTop:4,display:"flex",alignItems:"center",justifyContent:"center",gap:8,background:"rgba(167,139,250,0.12)",border:"1px solid rgba(167,139,250,0.28)",borderRadius:13,color:"rgba(196,181,253,0.95)",fontSize:13,fontFamily:MONO,fontWeight:700,letterSpacing:"0.08em",cursor:disabled?"not-allowed":"pointer",boxShadow:"0 0 24px rgba(167,139,250,0.12)",transition:"all 0.2s",opacity:disabled?0.6:1,zIndex:302,position:"relative"}}
-      onMouseEnter={e=>{if(!disabled){e.currentTarget.style.background="rgba(167,139,250,0.2)";e.currentTarget.style.boxShadow="0 0 32px rgba(167,139,250,0.25)";}}}
-      onMouseLeave={e=>{e.currentTarget.style.background="rgba(167,139,250,0.12)";e.currentTarget.style.boxShadow="0 0 24px rgba(167,139,250,0.12)";}}>
+    <button onClick={e=>{e.stopPropagation();if(!disabled)onClick();}} disabled={disabled}
+      style={{width:"100%",padding:"15px",marginTop:4,display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+        background:disabled?"rgba(139,92,246,0.08)":"linear-gradient(135deg,rgba(139,92,246,0.18),rgba(99,102,241,0.12))",
+        border:"1px solid rgba(139,92,246,0.35)",borderRadius:14,color:"rgba(196,181,253,0.95)",fontSize:13,fontFamily:MONO,fontWeight:700,letterSpacing:"0.08em",
+        cursor:disabled?"not-allowed":"pointer",
+        boxShadow:disabled?"none":"0 0 30px rgba(139,92,246,0.15),inset 0 1px 0 rgba(255,255,255,0.07)",
+        transition:"all 0.25s cubic-bezier(0.34,1.56,0.64,1)",opacity:disabled?0.5:1,position:"relative",zIndex:302,overflow:"hidden"}}
+      onMouseEnter={e=>{if(!disabled){e.currentTarget.style.background="linear-gradient(135deg,rgba(139,92,246,0.28),rgba(99,102,241,0.2))";e.currentTarget.style.boxShadow="0 0 50px rgba(139,92,246,0.3),inset 0 1px 0 rgba(255,255,255,0.1)";e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.borderColor="rgba(139,92,246,0.55)";}}}
+      onMouseLeave={e=>{e.currentTarget.style.background="linear-gradient(135deg,rgba(139,92,246,0.18),rgba(99,102,241,0.12))";e.currentTarget.style.boxShadow="0 0 30px rgba(139,92,246,0.15),inset 0 1px 0 rgba(255,255,255,0.07)";e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.borderColor="rgba(139,92,246,0.35)";}}>
       {children}
     </button>
   );
-  const ErrBox = ({ msg }) => msg ? <div style={{marginBottom:14,padding:"10px 14px",background:"rgba(251,113,133,0.07)",border:"1px solid rgba(251,113,133,0.18)",borderRadius:10,color:"rgba(251,113,133,0.9)",fontSize:12,fontFamily:MONO}}>{msg}</div> : null;
+  const ErrBox = ({ msg }) => msg ? <div style={{marginBottom:14,padding:"11px 15px",background:"rgba(251,113,133,0.06)",border:"1px solid rgba(251,113,133,0.2)",borderRadius:12,color:"rgba(251,113,133,0.9)",fontSize:12,fontFamily:MONO,boxShadow:"0 0 20px rgba(251,113,133,0.05)"}}>{msg}</div> : null;
   const BackBtn = ({ onClick }) => (
-    <button onClick={e=>{e.stopPropagation();onClick();}} style={{position:"absolute",top:24,right:24,background:"none",border:"none",color:"rgba(255,255,255,0.3)",cursor:"pointer",fontSize:13,fontFamily:MONO,letterSpacing:"0.06em",padding:"4px 8px",borderRadius:8,transition:"color 0.2s",zIndex:302,pointerEvents:"all"}}
-      onMouseEnter={e=>e.currentTarget.style.color="rgba(255,255,255,0.7)"} onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.3)"}>← BACK</button>
+    <button onClick={e=>{e.stopPropagation();onClick();}} style={{position:"absolute",top:24,right:24,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",color:"rgba(255,255,255,0.35)",cursor:"pointer",fontSize:11,fontFamily:MONO,letterSpacing:"0.08em",padding:"5px 10px",borderRadius:8,transition:"all 0.2s",zIndex:302}}
+      onMouseEnter={e=>{e.currentTarget.style.color="rgba(255,255,255,0.8)";e.currentTarget.style.background="rgba(255,255,255,0.08)";e.currentTarget.style.borderColor="rgba(255,255,255,0.15)";}} onMouseLeave={e=>{e.currentTarget.style.color="rgba(255,255,255,0.35)";e.currentTarget.style.background="rgba(255,255,255,0.04)";e.currentTarget.style.borderColor="rgba(255,255,255,0.07)";}}>← BACK</button>
   );
 
   const wrap = (children) => (
-    <div style={{position:"fixed",inset:0,background:"#080810",zIndex:300,fontFamily:SANS,overflowY:"auto"}}>
+    <div style={{position:"fixed",inset:0,background:"#05050f",zIndex:300,fontFamily:SANS,overflowY:"auto"}}>
       {BG}
       <div style={{minHeight:"100%",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}}>
         <div onClick={e=>e.stopPropagation()} style={{...card,width:"100%",position:"relative",zIndex:301}}>{children}</div>
@@ -306,17 +350,19 @@ const LoginScreen = React.memo(function LoginScreen({ onLogin }) {
   );
 
   if(mode==="choose") return (
-    <div style={{position:"fixed",inset:0,background:"#080810",zIndex:300,fontFamily:SANS,overflowY:"auto"}}>
+    <div style={{position:"fixed",inset:0,background:"#05050f",zIndex:300,fontFamily:SANS,overflowY:"auto"}}>
       {BG}
       <div style={{minHeight:"100%",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}}>
         <div style={{...card,width:"100%"}}>
           <Logo/>
-          <div style={{fontSize:30,fontWeight:700,color:"#fff",marginBottom:5,letterSpacing:"-0.03em"}}>Welcome to Tickers</div>
-          <div style={{fontSize:14,color:"rgba(255,255,255,0.32)",marginBottom:"2.25rem",lineHeight:1.6}}>The leaderboard for serious day traders.</div>
-          <button onClick={e=>{e.stopPropagation();reset("register");}} style={{width:"100%",padding:"14px",marginBottom:10,background:"rgba(167,139,250,0.12)",border:"1px solid rgba(167,139,250,0.28)",borderRadius:13,color:"rgba(196,181,253,0.95)",fontSize:13,fontFamily:MONO,fontWeight:700,letterSpacing:"0.08em",cursor:"pointer",boxShadow:"0 0 24px rgba(167,139,250,0.12)",transition:"all 0.2s",position:"relative",zIndex:302}}
-            onMouseEnter={e=>{e.currentTarget.style.background="rgba(167,139,250,0.2)";e.currentTarget.style.boxShadow="0 0 32px rgba(167,139,250,0.3)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(167,139,250,0.12)";e.currentTarget.style.boxShadow="0 0 24px rgba(167,139,250,0.12)";}}>CREATE ACCOUNT →</button>
-          <button onClick={e=>{e.stopPropagation();reset("login");}} style={{width:"100%",padding:"14px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:13,color:"rgba(255,255,255,0.5)",fontSize:13,fontFamily:MONO,fontWeight:600,letterSpacing:"0.08em",cursor:"pointer",transition:"all 0.2s",position:"relative",zIndex:302}}
-            onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.06)";e.currentTarget.style.color="rgba(255,255,255,0.75)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.03)";e.currentTarget.style.color="rgba(255,255,255,0.5)";}}>SIGN IN</button>
+          <div style={{fontSize:32,fontWeight:800,color:"#fff",marginBottom:6,letterSpacing:"-0.04em",lineHeight:1.1}}>Welcome to <span className="glow-text">Tickers</span></div>
+          <div style={{fontSize:14,color:"rgba(255,255,255,0.3)",marginBottom:"2.5rem",lineHeight:1.6}}>The leaderboard for serious day traders.</div>
+          <button onClick={e=>{e.stopPropagation();reset("register");}}
+            style={{width:"100%",padding:"15px",marginBottom:10,background:"linear-gradient(135deg,rgba(139,92,246,0.18),rgba(99,102,241,0.12))",border:"1px solid rgba(139,92,246,0.35)",borderRadius:14,color:"rgba(196,181,253,0.95)",fontSize:13,fontFamily:MONO,fontWeight:700,letterSpacing:"0.08em",cursor:"pointer",boxShadow:"0 0 30px rgba(139,92,246,0.15),inset 0 1px 0 rgba(255,255,255,0.07)",transition:"all 0.25s",position:"relative",zIndex:302}}
+            onMouseEnter={e=>{e.currentTarget.style.background="linear-gradient(135deg,rgba(139,92,246,0.28),rgba(99,102,241,0.2))";e.currentTarget.style.boxShadow="0 0 50px rgba(139,92,246,0.3)";e.currentTarget.style.transform="translateY(-1px)";}} onMouseLeave={e=>{e.currentTarget.style.background="linear-gradient(135deg,rgba(139,92,246,0.18),rgba(99,102,241,0.12))";e.currentTarget.style.boxShadow="0 0 30px rgba(139,92,246,0.15)";e.currentTarget.style.transform="translateY(0)";}}>CREATE ACCOUNT →</button>
+          <button onClick={e=>{e.stopPropagation();reset("login");}}
+            style={{width:"100%",padding:"15px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,color:"rgba(255,255,255,0.45)",fontSize:13,fontFamily:MONO,fontWeight:600,letterSpacing:"0.08em",cursor:"pointer",transition:"all 0.2s",position:"relative",zIndex:302}}
+            onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.06)";e.currentTarget.style.color="rgba(255,255,255,0.8)";e.currentTarget.style.borderColor="rgba(255,255,255,0.14)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.03)";e.currentTarget.style.color="rgba(255,255,255,0.45)";e.currentTarget.style.borderColor="rgba(255,255,255,0.08)";}}>SIGN IN</button>
         </div>
       </div>
     </div>
@@ -324,8 +370,8 @@ const LoginScreen = React.memo(function LoginScreen({ onLogin }) {
 
   if(mode==="register") return wrap(<>
     <Logo/><BackBtn onClick={()=>reset("choose")}/>
-    <div style={{fontSize:26,fontWeight:700,color:"#fff",marginBottom:4,letterSpacing:"-0.03em"}}>Create account</div>
-    <div style={{fontSize:13,color:"rgba(255,255,255,0.3)",marginBottom:"1.5rem",lineHeight:1.5}}>First time? Set up your profile.</div>
+    <div style={{fontSize:26,fontWeight:800,color:"#fff",marginBottom:3,letterSpacing:"-0.04em"}}>Create account</div>
+    <div style={{fontSize:13,color:"rgba(255,255,255,0.28)",marginBottom:"1.5rem",lineHeight:1.5}}>Join the leaderboard. Set up your profile below.</div>
     {/* Profile pic */}
     <div style={{marginBottom:18}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
@@ -358,8 +404,8 @@ const LoginScreen = React.memo(function LoginScreen({ onLogin }) {
 
   return wrap(<>
     <Logo/><BackBtn onClick={()=>reset("choose")}/>
-    <div style={{fontSize:26,fontWeight:700,color:"#fff",marginBottom:4,letterSpacing:"-0.03em"}}>Sign in</div>
-    <div style={{fontSize:13,color:"rgba(255,255,255,0.3)",marginBottom:"1.75rem",lineHeight:1.5}}>Welcome back. Enter your credentials.</div>
+    <div style={{fontSize:26,fontWeight:800,color:"#fff",marginBottom:3,letterSpacing:"-0.04em"}}>Welcome back</div>
+    <div style={{fontSize:13,color:"rgba(255,255,255,0.28)",marginBottom:"1.75rem",lineHeight:1.5}}>Sign in to your Tickers account.</div>
     <InputField label="EMAIL"    value={email}    onChange={setEmail}    placeholder="you@example.com" type="email"    onEnter={doLogin}/>
     <InputField label="PASSWORD" value={password} onChange={setPassword} placeholder="Your password"   type="password" onEnter={doLogin}/>
     <ErrBox msg={err}/>
@@ -653,77 +699,44 @@ function PnlLogs({ user, sessions, onDeleteSession }) {
 }
 
 /* ── NavUserMenu ─────────────────────────────────────────── */
-function NavUserMenu({ user, onLogout, onSubmit, onDeleteAccount }) {
+function NavUserMenu({ user, onLogout, onSubmit, onRequestDeleteAccount }) {
   const [open,setOpen]=useState(false);
-  const [confirmDel,setConfirmDel]=useState(false);
-  const [deleting,setDeleting]=useState(false);
   const ref=useRef();
   useEffect(()=>{ const h=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false);}; document.addEventListener("mousedown",h); return()=>document.removeEventListener("mousedown",h); },[]);
   const hues=[258,280,240,310,265,250,295]; const h=hues[user.name.charCodeAt(0)%hues.length];
-
-  const doDelete = async () => {
-    setDeleting(true);
-    await onDeleteAccount();
-    setDeleting(false);
-    setConfirmDel(false);
-  };
-
   return (
     <div style={{display:"flex",alignItems:"center",gap:10}} ref={ref}>
-      <button onClick={onSubmit} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 16px",background:"rgba(167,139,250,0.08)",border:"1px solid rgba(167,139,250,0.2)",borderRadius:99,color:"rgba(196,181,253,0.9)",fontSize:11,cursor:"pointer",fontWeight:600,letterSpacing:"0.05em",fontFamily:MONO,boxShadow:"0 0 16px rgba(167,139,250,0.1)",transition:"all 0.2s"}}
-        onMouseEnter={e=>{e.currentTarget.style.background="rgba(167,139,250,0.14)";e.currentTarget.style.boxShadow="0 0 24px rgba(167,139,250,0.2)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(167,139,250,0.08)";e.currentTarget.style.boxShadow="0 0 16px rgba(167,139,250,0.1)";}}>SUBMIT P&L</button>
+      <button onClick={onSubmit} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 16px",background:"rgba(139,92,246,0.08)",border:"1px solid rgba(139,92,246,0.22)",borderRadius:99,color:"rgba(196,181,253,0.9)",fontSize:11,cursor:"pointer",fontWeight:600,letterSpacing:"0.05em",fontFamily:MONO,boxShadow:"0 0 16px rgba(139,92,246,0.1)",transition:"all 0.2s"}}
+        onMouseEnter={e=>{e.currentTarget.style.background="rgba(139,92,246,0.16)";e.currentTarget.style.boxShadow="0 0 28px rgba(139,92,246,0.25)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(139,92,246,0.08)";e.currentTarget.style.boxShadow="0 0 16px rgba(139,92,246,0.1)";}}>SUBMIT P&L</button>
       <div style={{position:"relative"}}>
-        <div onClick={()=>setOpen(o=>!o)} style={{width:36,height:36,borderRadius:"50%",cursor:"pointer",flexShrink:0,overflow:"hidden",border:`1.5px solid ${open?"rgba(167,139,250,0.7)":"rgba(255,255,255,0.1)"}`,boxShadow:open?`0 0 18px hsla(${h},80%,65%,0.55),0 0 36px rgba(167,139,250,0.3)`:`0 0 10px hsla(${h},80%,65%,0.25)`,transition:"all 0.25s cubic-bezier(0.34,1.56,0.64,1)"}}>
-          <Avatar name={user.name} pic={user.pic} size={36}/>
+        <div onClick={()=>setOpen(o=>!o)} style={{width:38,height:38,borderRadius:"50%",cursor:"pointer",flexShrink:0,overflow:"hidden",border:`2px solid ${open?"rgba(139,92,246,0.8)":"rgba(255,255,255,0.1)"}`,boxShadow:open?`0 0 24px hsla(${h},80%,65%,0.6),0 0 48px rgba(139,92,246,0.35)`:`0 0 12px hsla(${h},80%,65%,0.25)`,transition:"all 0.25s cubic-bezier(0.34,1.56,0.64,1)"}}>
+          <Avatar name={user.name} pic={user.pic} size={38}/>
         </div>
-        {open&&<div style={{position:"absolute",top:"calc(100% + 10px)",right:0,minWidth:210,background:"#0c0c18",border:"1px solid rgba(167,139,250,0.2)",borderRadius:16,boxShadow:"0 16px 48px rgba(0,0,0,0.7),0 0 40px rgba(167,139,250,0.12)",overflow:"hidden",animation:"fadeIn 0.18s ease",zIndex:50}}>
-          <div style={{padding:"14px 16px",borderBottom:"1px solid rgba(255,255,255,0.05)",display:"flex",alignItems:"center",gap:11,background:"rgba(167,139,250,0.04)"}}>
+        {open&&<div style={{position:"absolute",top:"calc(100% + 12px)",right:0,minWidth:220,background:"linear-gradient(145deg,#0e0c1f,#09091a)",border:"1px solid rgba(139,92,246,0.2)",borderRadius:18,boxShadow:"0 20px 60px rgba(0,0,0,0.8),0 0 50px rgba(139,92,246,0.1),inset 0 1px 0 rgba(255,255,255,0.05)",overflow:"hidden",animation:"fadeIn 0.18s ease",zIndex:500}}>
+          <div style={{padding:"15px 17px",borderBottom:"1px solid rgba(255,255,255,0.05)",display:"flex",alignItems:"center",gap:12,background:"rgba(139,92,246,0.05)"}}>
             <div style={{position:"relative",flexShrink:0}}>
-              <Avatar name={user.name} pic={user.pic} size={38}/>
-              <div style={{position:"absolute",bottom:1,right:1,width:9,height:9,borderRadius:"50%",background:G,border:"1.5px solid #0c0c18",boxShadow:`0 0 8px ${G}`}}/>
+              <Avatar name={user.name} pic={user.pic} size={40}/>
+              <div style={{position:"absolute",bottom:1,right:1,width:10,height:10,borderRadius:"50%",background:G,border:"2px solid #09091a",boxShadow:`0 0 10px ${G}`}}/>
             </div>
             <div>
-              <div style={{fontSize:14,fontWeight:700,fontFamily:SANS,color:"#fff",letterSpacing:"-0.02em"}}>{user.name}</div>
-              <div style={{fontSize:10,fontFamily:MONO,color:"rgba(52,211,153,0.6)",letterSpacing:"0.06em",marginTop:2}}>● ACTIVE</div>
+              <div style={{fontSize:15,fontWeight:700,fontFamily:SANS,color:"#fff",letterSpacing:"-0.02em"}}>{user.name}</div>
+              <div style={{fontSize:10,fontFamily:MONO,color:"rgba(52,211,153,0.65)",letterSpacing:"0.07em",marginTop:2}}>● ONLINE</div>
             </div>
           </div>
-          <div style={{padding:"8px",display:"flex",flexDirection:"column",gap:4}}>
-            <button onClick={()=>{setOpen(false);onLogout();}} style={{width:"100%",padding:"11px 14px",borderRadius:10,cursor:"pointer",background:"rgba(251,113,133,0.06)",border:"1px solid rgba(251,113,133,0.15)",color:"rgba(251,113,133,0.85)",fontFamily:MONO,fontSize:11,fontWeight:700,letterSpacing:"0.08em",display:"flex",alignItems:"center",gap:8,transition:"all 0.2s"}}
-              onMouseEnter={e=>{e.currentTarget.style.background="rgba(251,113,133,0.13)";e.currentTarget.style.borderColor="rgba(251,113,133,0.35)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(251,113,133,0.06)";e.currentTarget.style.borderColor="rgba(251,113,133,0.15)";}}>
+          <div style={{padding:"8px",display:"flex",flexDirection:"column",gap:3}}>
+            <button onClick={()=>{setOpen(false);onLogout();}} style={{width:"100%",padding:"11px 14px",borderRadius:11,cursor:"pointer",background:"rgba(251,113,133,0.05)",border:"1px solid rgba(251,113,133,0.12)",color:"rgba(251,113,133,0.8)",fontFamily:MONO,fontSize:11,fontWeight:700,letterSpacing:"0.08em",display:"flex",alignItems:"center",gap:9,transition:"all 0.2s"}}
+              onMouseEnter={e=>{e.currentTarget.style.background="rgba(251,113,133,0.12)";e.currentTarget.style.borderColor="rgba(251,113,133,0.3)";e.currentTarget.style.color="rgba(251,113,133,1)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(251,113,133,0.05)";e.currentTarget.style.borderColor="rgba(251,113,133,0.12)";e.currentTarget.style.color="rgba(251,113,133,0.8)";}}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><polyline points="16,17 21,12 16,7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
               SIGN OUT
             </button>
-            <button onClick={()=>{setOpen(false);setConfirmDel(true);}} style={{width:"100%",padding:"11px 14px",borderRadius:10,cursor:"pointer",background:"rgba(255,60,60,0.05)",border:"1px solid rgba(255,60,60,0.12)",color:"rgba(255,100,100,0.7)",fontFamily:MONO,fontSize:11,fontWeight:700,letterSpacing:"0.08em",display:"flex",alignItems:"center",gap:8,transition:"all 0.2s"}}
-              onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,60,60,0.12)";e.currentTarget.style.borderColor="rgba(255,60,60,0.3)";e.currentTarget.style.color="rgba(255,100,100,1)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,60,60,0.05)";e.currentTarget.style.borderColor="rgba(255,60,60,0.12)";e.currentTarget.style.color="rgba(255,100,100,0.7)";}}>
+            <button onClick={()=>{setOpen(false);onRequestDeleteAccount();}} style={{width:"100%",padding:"11px 14px",borderRadius:11,cursor:"pointer",background:"rgba(255,50,50,0.04)",border:"1px solid rgba(255,50,50,0.1)",color:"rgba(255,100,100,0.65)",fontFamily:MONO,fontSize:11,fontWeight:700,letterSpacing:"0.08em",display:"flex",alignItems:"center",gap:9,transition:"all 0.2s"}}
+              onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,50,50,0.1)";e.currentTarget.style.borderColor="rgba(255,50,50,0.28)";e.currentTarget.style.color="rgba(255,100,100,1)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,50,50,0.04)";e.currentTarget.style.borderColor="rgba(255,50,50,0.1)";e.currentTarget.style.color="rgba(255,100,100,0.65)";}}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><polyline points="3,6 5,6 21,6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M10 11v6M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/></svg>
               DELETE ACCOUNT
             </button>
           </div>
         </div>}
       </div>
-
-      {/* ── Delete Account Confirmation Modal ── */}
-      {confirmDel&&<div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.8)",backdropFilter:"blur(16px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}} onClick={()=>!deleting&&setConfirmDel(false)}>
-        <div onClick={e=>e.stopPropagation()} style={{position:"relative",background:"linear-gradient(135deg,rgba(14,14,28,0.98),rgba(10,10,20,0.98))",border:"1px solid rgba(255,60,60,0.2)",borderRadius:24,padding:"36px",width:400,maxWidth:"92vw",boxShadow:"0 0 0 1px rgba(255,60,60,0.05),0 0 60px rgba(255,60,60,0.15),0 0 120px rgba(255,60,60,0.08),0 40px 80px rgba(0,0,0,0.7)",animation:"fadeIn 0.25s ease",overflow:"hidden",textAlign:"center"}}>
-          {/* orbs */}
-          <div style={{position:"absolute",top:"-40px",right:"-40px",width:"160px",height:"160px",borderRadius:"50%",background:"radial-gradient(circle,rgba(255,60,60,0.18),transparent 65%)",pointerEvents:"none"}}/>
-          <div style={{position:"absolute",bottom:"-30px",left:"-30px",width:"120px",height:"120px",borderRadius:"50%",background:"radial-gradient(circle,rgba(255,60,60,0.1),transparent 65%)",pointerEvents:"none"}}/>
-          {/* icon */}
-          <div style={{width:56,height:56,borderRadius:16,background:"rgba(255,60,60,0.1)",border:"1px solid rgba(255,60,60,0.25)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 20px",boxShadow:"0 0 24px rgba(255,60,60,0.2)"}}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><polyline points="3,6 5,6 21,6" stroke="rgba(255,100,100,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="rgba(255,100,100,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M10 11v6M14 11v6" stroke="rgba(255,100,100,0.9)" strokeWidth="2" strokeLinecap="round"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" stroke="rgba(255,100,100,0.9)" strokeWidth="2" strokeLinejoin="round"/></svg>
-          </div>
-          <div style={{fontSize:22,fontWeight:700,fontFamily:SANS,color:"#fff",marginBottom:10,letterSpacing:"-0.025em"}}>Delete Account?</div>
-          <div style={{fontSize:13,fontFamily:SANS,color:"rgba(255,255,255,0.38)",lineHeight:1.7,marginBottom:28}}>This will permanently delete your account, leaderboard entry, and all PnL logs.<br/><span style={{color:"rgba(255,100,100,0.8)",fontWeight:600}}>This cannot be undone.</span></div>
-          <div style={{display:"flex",gap:10}}>
-            <button onClick={()=>setConfirmDel(false)} disabled={deleting} style={{flex:1,padding:"13px",borderRadius:12,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.09)",color:"rgba(255,255,255,0.55)",fontFamily:MONO,fontSize:12,fontWeight:700,letterSpacing:"0.06em",cursor:"pointer",transition:"all 0.2s"}}
-              onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.08)";e.currentTarget.style.color="#fff";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.04)";e.currentTarget.style.color="rgba(255,255,255,0.55)";}}>CANCEL</button>
-            <button onClick={doDelete} disabled={deleting} style={{flex:1,padding:"13px",borderRadius:12,background:"rgba(255,60,60,0.15)",border:"1px solid rgba(255,60,60,0.35)",color:"rgba(255,110,110,0.95)",fontFamily:MONO,fontSize:12,fontWeight:700,letterSpacing:"0.06em",cursor:deleting?"not-allowed":"pointer",transition:"all 0.2s",opacity:deleting?0.7:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7,boxShadow:"0 0 20px rgba(255,60,60,0.15)"}}
-              onMouseEnter={e=>{if(!deleting){e.currentTarget.style.background="rgba(255,60,60,0.25)";e.currentTarget.style.boxShadow="0 0 30px rgba(255,60,60,0.3)";}}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,60,60,0.15)";e.currentTarget.style.boxShadow="0 0 20px rgba(255,60,60,0.15)";}}>
-              {deleting?<><Spin/> DELETING...</>:"YES, DELETE"}
-            </button>
-          </div>
-        </div>
-      </div>}
     </div>
   );
 }
@@ -742,6 +755,9 @@ function App() {
   const [activePage,  setActivePage]  = useState("leaderboard");
   const [appLoading,  setAppLoading]  = useState(true);
   const [lastSync,    setLastSync]    = useState(null);
+  const [confirmDelAccount, setConfirmDelAccount] = useState(false);
+  const [deletingAccount,   setDeletingAccount]   = useState(false);
+  const [timeFilter,  setTimeFilter]  = useState("all");
 
   useEffect(()=>{ const t=setInterval(()=>setTick(x=>x+1),1000); return()=>clearInterval(t); },[]);
   const livePulse = Math.sin(tick*0.3)*0.4+0.6;
@@ -789,9 +805,27 @@ function App() {
     return()=>{ SUPA.removeChannel(ch); };
   },[]);
 
-  const ranked     = useMemo(()=>[...students].sort((a,b)=>b.pnl-a.pnl).map((s,i)=>({...s,rank:i+1})),[students]);
+  const filteredStudents = useMemo(()=>{
+    if(timeFilter==="all") return students;
+    const now = new Date();
+    const cutoff = new Date();
+    if(timeFilter==="today") cutoff.setHours(0,0,0,0);
+    else if(timeFilter==="week") cutoff.setDate(now.getDate()-7);
+    else if(timeFilter==="month") cutoff.setDate(now.getDate()-30);
+    // Filter sessions by time, then recompute per-trader stats
+    const filtered = sessions.filter(s=>new Date(s.submitted_at)>=cutoff);
+    return students.map(trader=>{
+      const ts = filtered.filter(s=>s.user_id===trader.id);
+      const pnl=ts.reduce((a,s)=>a+(s.pnl||0),0);
+      const trades=ts.reduce((a,s)=>a+(s.trades||0),0);
+      const wins=ts.reduce((a,s)=>a+(s.wins||0),0);
+      return computeStats({...trader,pnl,trades,wins});
+    }).filter(t=>t.trades>0||timeFilter==="all");
+  },[students,sessions,timeFilter]);
+
+  const ranked     = useMemo(()=>[...filteredStudents].sort((a,b)=>b.pnl-a.pnl).map((s,i)=>({...s,rank:i+1})),[filteredStudents]);
   const prevRanked = useMemo(()=>[...prevStudents].sort((a,b)=>b.pnl-a.pnl).map((s,i)=>({...s,rank:i+1})),[prevStudents]);
-  const totals     = useMemo(()=>({pnl:students.reduce((a,x)=>a+x.pnl,0),wr:students.length?students.reduce((a,x)=>a+x.winRate,0)/students.length:0,trades:students.reduce((a,x)=>a+x.trades,0),active:students.length}),[students]);
+  const totals     = useMemo(()=>({pnl:filteredStudents.reduce((a,x)=>a+x.pnl,0),wr:filteredStudents.length?filteredStudents.reduce((a,x)=>a+x.winRate,0)/filteredStudents.length:0,trades:filteredStudents.reduce((a,x)=>a+x.trades,0),active:filteredStudents.length}),[filteredStudents]);
   const myCount    = user?sessions.filter(s=>s.user_id===user.id).length:0;
 
   const handleLogin = React.useCallback(u => {
@@ -884,17 +918,20 @@ function App() {
   );
 
   return (
-    <div style={{background:"#080810",minHeight:"100vh",color:"#fff",fontFamily:SANS,position:"relative",overflow:"hidden"}}>
-      <div style={{position:"fixed",top:"-15%",left:"-12%",width:"50vw",height:"50vw",borderRadius:"50%",pointerEvents:"none",zIndex:0,background:"radial-gradient(circle,rgba(167,139,250,0.12),transparent 65%)"}}/>
-      <div style={{position:"fixed",top:"15%",right:"-12%",width:"40vw",height:"40vw",borderRadius:"50%",pointerEvents:"none",zIndex:0,background:"radial-gradient(circle,rgba(99,179,237,0.07),transparent 65%)"}}/>
-      <div style={{position:"fixed",bottom:"-10%",left:"18%",width:"45vw",height:"45vw",borderRadius:"50%",pointerEvents:"none",zIndex:0,background:"radial-gradient(circle,rgba(167,139,250,0.07),transparent 65%)"}}/>
-      <div style={{position:"fixed",bottom:"8%",right:"6%",width:"25vw",height:"25vw",borderRadius:"50%",pointerEvents:"none",zIndex:0,background:"radial-gradient(circle,rgba(52,211,153,0.05),transparent 65%)"}}/>
+    <div style={{background:"#05050f",minHeight:"100vh",color:"#fff",fontFamily:SANS,position:"relative",overflow:"hidden"}}>
+      {/* Background orbs */}
+      <div style={{position:"fixed",top:"-20%",left:"-15%",width:"60vw",height:"60vw",borderRadius:"50%",pointerEvents:"none",zIndex:0,background:"radial-gradient(circle,rgba(139,92,246,0.14),transparent 60%)",animation:"orbFloat 8s ease-in-out infinite"}}/>
+      <div style={{position:"fixed",top:"10%",right:"-18%",width:"50vw",height:"50vw",borderRadius:"50%",pointerEvents:"none",zIndex:0,background:"radial-gradient(circle,rgba(99,102,241,0.09),transparent 60%)",animation:"orbFloat 11s ease-in-out infinite reverse"}}/>
+      <div style={{position:"fixed",bottom:"-15%",left:"15%",width:"55vw",height:"55vw",borderRadius:"50%",pointerEvents:"none",zIndex:0,background:"radial-gradient(circle,rgba(139,92,246,0.08),transparent 60%)",animation:"orbFloat 14s ease-in-out infinite"}}/>
+      <div style={{position:"fixed",bottom:"5%",right:"5%",width:"30vw",height:"30vw",borderRadius:"50%",pointerEvents:"none",zIndex:0,background:"radial-gradient(circle,rgba(52,211,153,0.06),transparent 60%)",animation:"orbFloat 9s ease-in-out infinite reverse"}}/>
+      {/* Noise grain overlay */}
+      <div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:0,opacity:0.025,backgroundImage:"url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E')",backgroundRepeat:"repeat",backgroundSize:"256px"}}/>
 
       {!user&&<LoginScreen onLogin={handleLogin}/>}
 
       <div style={{position:"relative",zIndex:1,visibility:user?"visible":"hidden",pointerEvents:user?"auto":"none"}}>
         {/* NAV */}
-        <div style={{borderBottom:"1px solid rgba(255,255,255,0.06)",padding:"0 32px",display:"flex",alignItems:"center",justifyContent:"space-between",backdropFilter:"blur(24px)",background:"rgba(8,8,16,0.7)",position:"sticky",top:0,zIndex:10,height:60}}>
+        <div style={{borderBottom:"1px solid rgba(255,255,255,0.05)",padding:"0 32px",display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(5,5,15,0.85)",backdropFilter:"blur(30px)",WebkitBackdropFilter:"blur(30px)",position:"sticky",top:0,zIndex:10,height:64,boxShadow:"0 1px 0 rgba(139,92,246,0.1),0 4px 30px rgba(0,0,0,0.3)"}}>
           <div style={{display:"flex",alignItems:"center",gap:0}}>
             <div style={{display:"flex",alignItems:"center",gap:9,marginRight:28}}>
               <div style={{width:32,height:32,borderRadius:9,background:"rgba(167,139,250,0.1)",border:"1px solid rgba(167,139,250,0.22)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 0 16px rgba(167,139,250,0.2)"}}>
@@ -920,26 +957,40 @@ function App() {
               <span style={{width:6,height:6,borderRadius:"50%",background:G,display:"inline-block",boxShadow:`0 0 ${4+livePulse*8}px ${G},0 0 ${8+livePulse*14}px ${G}55`}}/>LIVE
               <span style={{fontSize:9,color:"rgba(52,211,153,0.45)",letterSpacing:"0.04em"}}>{new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}</span>
             </div>
-            {user&&<NavUserMenu user={user} onLogout={handleLogout} onSubmit={()=>setShowSub(true)} onDeleteAccount={handleDeleteAccount}/>}
+            {user&&<NavUserMenu user={user} onLogout={handleLogout} onSubmit={()=>setShowSub(true)} onRequestDeleteAccount={()=>setConfirmDelAccount(true)}/>}
           </div>
         </div>
 
         {/* PAGE */}
         {activePage==="pnllogs"&&user
           ?<PnlLogs user={user} sessions={sessions} onDeleteSession={handleDeleteSession}/>
-          :<div style={{padding:"44px 32px",maxWidth:1060,margin:"0 auto"}}>
-            <div style={{marginBottom:"2.5rem",animation:"fadeIn 0.5s ease"}}>
-              <h1 style={{margin:0,fontSize:52,fontWeight:700,fontFamily:SANS,letterSpacing:"-0.035em",lineHeight:1.05,color:"rgba(255,255,255,0.93)"}}>Leaderboard<span style={{color:"rgba(255,255,255,0.15)",fontWeight:300}}> /001</span></h1>
-              <p style={{margin:"10px 0 0",fontSize:11,fontFamily:MONO,color:"rgba(255,255,255,0.22)",letterSpacing:"0.08em"}}>TOP DAY TRADERS · RANKED BY P&L · REAL-TIME</p>
+          :<div style={{padding:"32px 24px",maxWidth:1060,margin:"0 auto"}}>
+            <div style={{marginBottom:"2rem",animation:"fadeIn 0.5s ease",display:"flex",alignItems:"flex-end",justifyContent:"space-between",flexWrap:"wrap",gap:16}}>
+              <div>
+                <h1 style={{margin:0,fontSize:"clamp(36px,5vw,52px)",fontWeight:800,fontFamily:SANS,letterSpacing:"-0.04em",lineHeight:1.0,color:"rgba(255,255,255,0.95)"}}>Leaderboard</h1>
+                <p style={{margin:"8px 0 0",fontSize:11,fontFamily:MONO,color:"rgba(255,255,255,0.2)",letterSpacing:"0.1em"}}>TOP DAY TRADERS · RANKED BY P&L · REAL-TIME</p>
+              </div>
+              {/* Time filter */}
+              <div style={{display:"flex",gap:6,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:14,padding:5}}>
+                {[{id:"today",label:"Today"},{id:"week",label:"Week"},{id:"month",label:"Month"},{id:"all",label:"All Time"}].map(f=>{
+                  const active=timeFilter===f.id;
+                  return <button key={f.id} onClick={()=>setTimeFilter(f.id)}
+                    style={{padding:"8px 14px",borderRadius:10,border:active?"1px solid rgba(139,92,246,0.5)":"1px solid transparent",background:active?"rgba(139,92,246,0.18)":"transparent",color:active?"rgba(196,181,253,0.95)":"rgba(255,255,255,0.35)",fontFamily:MONO,fontSize:11,fontWeight:700,letterSpacing:"0.06em",cursor:"pointer",transition:"all 0.2s",boxShadow:active?"0 0 20px rgba(139,92,246,0.2)":"none",whiteSpace:"nowrap"}}
+                    onMouseEnter={e=>{if(!active){e.currentTarget.style.color="rgba(255,255,255,0.7)";e.currentTarget.style.background="rgba(255,255,255,0.05)";e.currentTarget.style.boxShadow="0 0 16px rgba(139,92,246,0.15)";}}}
+                    onMouseLeave={e=>{if(!active){e.currentTarget.style.color="rgba(255,255,255,0.35)";e.currentTarget.style.background="transparent";e.currentTarget.style.boxShadow="none";}}}>
+                    {f.label}
+                  </button>;
+                })}
+              </div>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:"2.5rem"}}>
+            <div className="stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:"2rem"}}>
               <StatCard label="ACTIVE TRADERS" val={String(totals.active)}/>
               <StatCard label="TOTAL P&L"      val={fmt(totals.pnl)}  color={totals.pnl>=0?G:R} glow={totals.pnl>=0?G:R}/>
               <StatCard label="AVG WIN RATE"   val={pct(totals.wr)}/>
               <StatCard label="TOTAL TRADES"   val={String(totals.trades)}/>
             </div>
-            <div style={{border:"1px solid rgba(255,255,255,0.06)",borderRadius:18,overflow:"hidden",background:"rgba(255,255,255,0.02)",backdropFilter:"blur(10px)"}}>
-              <div style={{display:"grid",gridTemplateColumns:"52px 1fr 140px 110px 80px 130px",padding:"12px 24px",borderBottom:"1px solid rgba(255,255,255,0.05)",fontFamily:MONO,fontSize:10,color:"rgba(255,255,255,0.2)",letterSpacing:"0.1em"}}>
+            <div style={{border:"1px solid rgba(255,255,255,0.07)",borderRadius:18,overflow:"hidden",background:"rgba(12,10,26,0.8)"}}>
+              <div style={{display:"grid",gridTemplateColumns:"44px 1fr 120px 95px 70px 110px",padding:"11px 20px",borderBottom:"1px solid rgba(255,255,255,0.05)",fontFamily:MONO,fontSize:10,color:"rgba(255,255,255,0.18)",letterSpacing:"0.1em"}}>
                 <span>#</span><span>TRADER</span><span style={{textAlign:"right"}}>P&L</span><span style={{textAlign:"right"}}>WIN %</span><span style={{textAlign:"right"}}>TRADES</span><span style={{textAlign:"right"}}>AVG RET</span>
               </div>
               {ranked.map((t,i)=>{
@@ -957,6 +1008,35 @@ function App() {
 
       {showSub&&user&&<SubmitPanel user={user} students={students} onClose={()=>setShowSub(false)} onSubmit={handleSubmit}/>}
       {toast&&<Toast msg={toast.msg} isError={toast.isError} onDone={()=>setToast(null)}/>}
+
+      {/* ── Delete Account Modal — rendered at root so always centered ── */}
+      {confirmDelAccount&&<div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.82)",backdropFilter:"blur(18px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}} onClick={()=>!deletingAccount&&setConfirmDelAccount(false)}>
+        <div onClick={e=>e.stopPropagation()} className="modal-enter" style={{position:"relative",background:"linear-gradient(145deg,rgba(13,10,26,0.99),rgba(8,8,18,0.99))",border:"1px solid rgba(255,60,60,0.22)",borderRadius:26,padding:"38px",width:420,maxWidth:"92vw",boxShadow:"0 0 0 1px rgba(255,60,60,0.06),0 0 80px rgba(255,60,60,0.18),0 0 160px rgba(255,60,60,0.08),0 50px 100px rgba(0,0,0,0.8)",overflow:"hidden",textAlign:"center"}}>
+          <div style={{position:"absolute",top:"-50px",right:"-50px",width:"200px",height:"200px",borderRadius:"50%",background:"radial-gradient(circle,rgba(255,60,60,0.2),transparent 65%)",pointerEvents:"none"}}/>
+          <div style={{position:"absolute",bottom:"-40px",left:"-40px",width:"160px",height:"160px",borderRadius:"50%",background:"radial-gradient(circle,rgba(255,60,60,0.1),transparent 65%)",pointerEvents:"none"}}/>
+          <div style={{position:"absolute",top:"50%",left:"-60px",width:"120px",height:"120px",borderRadius:"50%",background:"radial-gradient(circle,rgba(139,92,246,0.08),transparent 65%)",pointerEvents:"none"}}/>
+          <div style={{width:60,height:60,borderRadius:18,background:"rgba(255,60,60,0.1)",border:"1px solid rgba(255,60,60,0.28)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 22px",boxShadow:"0 0 30px rgba(255,60,60,0.25),inset 0 1px 0 rgba(255,255,255,0.05)"}}>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><polyline points="3,6 5,6 21,6" stroke="rgba(255,110,110,0.95)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="rgba(255,110,110,0.95)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M10 11v6M14 11v6" stroke="rgba(255,110,110,0.95)" strokeWidth="2" strokeLinecap="round"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" stroke="rgba(255,110,110,0.95)" strokeWidth="2" strokeLinejoin="round"/></svg>
+          </div>
+          <div style={{fontSize:24,fontWeight:800,fontFamily:SANS,color:"#fff",marginBottom:10,letterSpacing:"-0.03em"}}>Delete Account?</div>
+          <div style={{fontSize:14,fontFamily:SANS,color:"rgba(255,255,255,0.35)",lineHeight:1.75,marginBottom:30}}>
+            This will permanently delete your account, leaderboard entry, and all PnL logs.<br/>
+            <span style={{color:"rgba(255,100,100,0.85)",fontWeight:600}}>This cannot be undone.</span>
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={()=>setConfirmDelAccount(false)} disabled={deletingAccount}
+              style={{flex:1,padding:"14px",borderRadius:13,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.09)",color:"rgba(255,255,255,0.5)",fontFamily:MONO,fontSize:12,fontWeight:700,letterSpacing:"0.07em",cursor:"pointer",transition:"all 0.2s"}}
+              onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.08)";e.currentTarget.style.color="#fff";e.currentTarget.style.borderColor="rgba(255,255,255,0.15)";}}
+              onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.04)";e.currentTarget.style.color="rgba(255,255,255,0.5)";e.currentTarget.style.borderColor="rgba(255,255,255,0.09)";}}>CANCEL</button>
+            <button onClick={async()=>{setDeletingAccount(true);await handleDeleteAccount();setDeletingAccount(false);setConfirmDelAccount(false);}} disabled={deletingAccount}
+              style={{flex:1,padding:"14px",borderRadius:13,background:"rgba(255,60,60,0.14)",border:"1px solid rgba(255,60,60,0.38)",color:"rgba(255,110,110,0.95)",fontFamily:MONO,fontSize:12,fontWeight:700,letterSpacing:"0.07em",cursor:deletingAccount?"not-allowed":"pointer",transition:"all 0.2s",opacity:deletingAccount?0.7:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 0 24px rgba(255,60,60,0.15)"}}
+              onMouseEnter={e=>{if(!deletingAccount){e.currentTarget.style.background="rgba(255,60,60,0.24)";e.currentTarget.style.boxShadow="0 0 40px rgba(255,60,60,0.32)";e.currentTarget.style.borderColor="rgba(255,60,60,0.55)";}}}
+              onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,60,60,0.14)";e.currentTarget.style.boxShadow="0 0 24px rgba(255,60,60,0.15)";e.currentTarget.style.borderColor="rgba(255,60,60,0.38)";}}>
+              {deletingAccount?<><Spin/> DELETING...</>:"YES, DELETE"}
+            </button>
+          </div>
+        </div>
+      </div>}
     </div>
   );
 }
