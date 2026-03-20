@@ -207,26 +207,39 @@ function LoginScreen({ onLogin }) {
   const reset = m => { setMode(m);setErr("");setUsername("");setEmail("");setPassword("");setConfirm("");setPreview(null); };
 
   const doRegister = async () => {
+    console.log("🔵 doRegister called");
     setErr("");
-    if(!preview)               return setErr("Profile picture is required.");
-    if(!username.trim())       return setErr("Username is required.");
-    if(username.trim().length<3) return setErr("Username must be at least 3 characters.");
-    if(!/\S+@\S+\.\S+/.test(email)) return setErr("Enter a valid email address.");
-    if(password.length<6)      return setErr("Password must be at least 6 characters.");
-    if(password!==confirm)     return setErr("Passwords don't match.");
+    if(!preview)               { console.log("❌ no preview"); return setErr("Profile picture is required."); }
+    if(!username.trim())       { console.log("❌ no username"); return setErr("Username is required."); }
+    if(username.trim().length<3) { console.log("❌ username too short"); return setErr("Username must be at least 3 characters."); }
+    if(!/\S+@\S+\.\S+/.test(email)) { console.log("❌ bad email"); return setErr("Enter a valid email address."); }
+    if(password.length<6)      { console.log("❌ password too short"); return setErr("Password must be at least 6 characters."); }
+    if(password!==confirm)     { console.log("❌ passwords don't match"); return setErr("Passwords don't match."); }
+    console.log("✅ Validation passed, starting signup...");
     setLoading(true);
     try {
-      const { data:ex } = await SUPA.from('profiles').select('id').eq('username',username.trim().toLowerCase()).maybeSingle();
+      console.log("🔵 Checking username duplicate...");
+      const { data:ex, error:exErr } = await SUPA.from('profiles').select('id').eq('username',username.trim().toLowerCase()).maybeSingle();
+      console.log("Username check result:", ex, exErr);
       if(ex) { setLoading(false); return setErr("Username already taken."); }
+      console.log("🔵 Calling signUp...");
       const { data:auth,error:authErr } = await SUPA.auth.signUp({ email, password });
+      console.log("SignUp result:", auth, authErr);
       if(authErr) { setLoading(false); return setErr(authErr.message); }
       if(!auth || !auth.user) { setLoading(false); return setErr("✉️ Check your email — a confirmation link was sent. Click it, then sign in."); }
       const uid = auth.user.id;
+      console.log("🔵 Uploading avatar for uid:", uid);
       const avatarUrl = await uploadImg(preview, `avatars/${uid}.jpg`);
-      await SUPA.from('profiles').insert({ id:uid, username:username.trim().toLowerCase(), display_name:username.trim(), avatar_url:avatarUrl, email });
-      await SUPA.from('traders').insert({ id:uid, username:username.trim().toLowerCase(), display_name:username.trim(), avatar_url:avatarUrl, pnl:0, trades:0, wins:0, hide_pnl:false });
+      console.log("✅ Avatar uploaded:", avatarUrl);
+      console.log("🔵 Inserting profile...");
+      const {error:profErr} = await SUPA.from('profiles').insert({ id:uid, username:username.trim().toLowerCase(), display_name:username.trim(), avatar_url:avatarUrl, email });
+      console.log("Profile insert error:", profErr);
+      console.log("🔵 Inserting trader...");
+      const {error:traderErr} = await SUPA.from('traders').insert({ id:uid, username:username.trim().toLowerCase(), display_name:username.trim(), avatar_url:avatarUrl, pnl:0, trades:0, wins:0, hide_pnl:false });
+      console.log("Trader insert error:", traderErr);
+      console.log("✅ All done, logging in!");
       onLogin({ name:username.trim(), pic:avatarUrl, id:uid, email });
-    } catch(e) { setLoading(false); setErr(e.message||"Something went wrong."); console.error("Register error:", e); }
+    } catch(e) { setLoading(false); setErr(e.message||"Something went wrong."); console.error("❌ Register error:", e); }
   };
 
   const doLogin = async () => {
@@ -835,3 +848,4 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
 </body>
 </html>
+
