@@ -55,9 +55,9 @@ const computeStats = s => ({ ...s, winRate: s.trades>0?(s.wins/s.trades)*100:0, 
 /* upload a base64 dataUrl to Supabase storage, return public URL */
 const uploadImg = async (dataUrl, path) => {
   const blob = await fetch(dataUrl).then(r => r.blob());
-  const { error } = await SUPA.storage.from('proofs').upload(path, blob, { contentType: blob.type, upsert: true });
+  const { error } = await SUPA.storage.from('Tickers-Proofs').upload(path, blob, { contentType: blob.type, upsert: true });
   if (error) throw error;
-  return SUPA.storage.from('proofs').getPublicUrl(path).data.publicUrl;
+  return SUPA.storage.from('Tickers-Proofs').getPublicUrl(path).data.publicUrl;
 };
 
 /* ── Avatar ─────────────────────────────────────────────── */
@@ -220,12 +220,13 @@ function LoginScreen({ onLogin }) {
       if(ex) { setLoading(false); return setErr("Username already taken."); }
       const { data:auth,error:authErr } = await SUPA.auth.signUp({ email, password });
       if(authErr) { setLoading(false); return setErr(authErr.message); }
+      if(!auth || !auth.user) { setLoading(false); return setErr("✉️ Check your email — a confirmation link was sent. Click it, then sign in."); }
       const uid = auth.user.id;
       const avatarUrl = await uploadImg(preview, `avatars/${uid}.jpg`);
       await SUPA.from('profiles').insert({ id:uid, username:username.trim().toLowerCase(), display_name:username.trim(), avatar_url:avatarUrl, email });
       await SUPA.from('traders').insert({ id:uid, username:username.trim().toLowerCase(), display_name:username.trim(), avatar_url:avatarUrl, pnl:0, trades:0, wins:0, hide_pnl:false });
       onLogin({ name:username.trim(), pic:avatarUrl, id:uid, email });
-    } catch(e) { setLoading(false); setErr(e.message||"Something went wrong."); }
+    } catch(e) { setLoading(false); setErr(e.message||"Something went wrong."); console.error("Register error:", e); }
   };
 
   const doLogin = async () => {
