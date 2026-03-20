@@ -201,7 +201,10 @@ function TraderRow({ t, prev, isSelected, onClick, isLast, isNew }) {
         </div>
         <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
           <Avatar name={t.name} pic={t.pic} size={30}/>
-          <span style={{fontSize:14,fontWeight:700,fontFamily:SANS,color:hov?"#fff":"rgba(255,255,255,0.92)",textShadow:hov?"0 0 18px rgba(139,92,246,0.5)":"none",transition:"all 0.2s",letterSpacing:"-0.02em",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</span>
+          <div style={{display:"flex",alignItems:"center",gap:7,minWidth:0}}>
+            <span style={{fontSize:14,fontWeight:700,fontFamily:SANS,color:hov?"#fff":"rgba(255,255,255,0.92)",textShadow:hov?"0 0 18px rgba(139,92,246,0.5)":"none",transition:"all 0.2s",letterSpacing:"-0.02em",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</span>
+            {t.role==="admin"&&<span style={{fontSize:8,fontFamily:MONO,fontWeight:700,letterSpacing:"0.08em",padding:"2px 7px",background:"linear-gradient(135deg,rgba(139,92,246,0.25),rgba(99,102,241,0.15))",border:"1px solid rgba(139,92,246,0.45)",borderRadius:99,color:"rgba(196,181,253,0.95)",whiteSpace:"nowrap",boxShadow:"0 0 10px rgba(139,92,246,0.3)"}}>ADMIN</span>}
+          </div>
         </div>
         <div style={{textAlign:"right",display:"flex",alignItems:"center",justifyContent:"flex-end"}}>
           {t.hidePnl?<PrivacyBadge name={t.name}/>:<span style={{fontFamily:MONO,fontSize:13,fontWeight:700,color:t.pnl>=0?G:R,textShadow:`0 0 ${hov?20:8}px ${t.pnl>=0?G:R}${hov?"cc":"55"}`,transition:"text-shadow 0.2s"}}>{fmt(t.pnl)}</span>}
@@ -314,7 +317,7 @@ const LoginScreen = React.memo(function LoginScreen({ onLogin }) {
       const {error:traderErr} = await SUPA.from('traders').insert({ id:uid, username:username.trim().toLowerCase(), display_name:username.trim(), avatar_url:avatarUrl, pnl:0, trades:0, wins:0, hide_pnl:false });
       console.log("Trader insert error:", traderErr);
       console.log("✅ All done, logging in!");
-      onLogin({ name:username.trim(), pic:avatarUrl, id:uid, email });
+      onLogin({ name:username.trim(), pic:avatarUrl, id:uid, email, role:'member' });
     } catch(e) { setLoading(false); setErr(e.message||"Something went wrong."); console.error("❌ Register error:", e); }
   };
 
@@ -328,7 +331,7 @@ const LoginScreen = React.memo(function LoginScreen({ onLogin }) {
       if(error) { setLoading(false); return setErr("Incorrect email or password."); }
       const { data:profile } = await SUPA.from('profiles').select('*').eq('id',auth.user.id).single();
       if(!profile) { setLoading(false); return setErr("Profile not found. Please register."); }
-      onLogin({ name:profile.display_name, pic:profile.avatar_url, id:auth.user.id, email });
+      onLogin({ name:profile.display_name, pic:profile.avatar_url, id:auth.user.id, email, role:profile.role||'member' });
     } catch(e) { setLoading(false); setErr(e.message||"Something went wrong."); }
   };
 
@@ -757,7 +760,10 @@ function NavUserMenu({ user, onLogout, onSubmit, onRequestDeleteAccount }) {
             </div>
             <div>
               <div style={{fontSize:15,fontWeight:700,fontFamily:SANS,color:"#fff",letterSpacing:"-0.02em"}}>{user.name}</div>
-              <div style={{fontSize:10,fontFamily:MONO,color:"rgba(52,211,153,0.65)",letterSpacing:"0.07em",marginTop:2}}>● ONLINE</div>
+              <div style={{display:"flex",alignItems:"center",gap:6,marginTop:3}}>
+                <div style={{fontSize:10,fontFamily:MONO,color:"rgba(52,211,153,0.65)",letterSpacing:"0.07em"}}>● ONLINE</div>
+                {user.role==="admin"&&<span style={{fontSize:8,fontFamily:MONO,fontWeight:700,padding:"1px 6px",background:"linear-gradient(135deg,rgba(139,92,246,0.3),rgba(99,102,241,0.2))",border:"1px solid rgba(139,92,246,0.5)",borderRadius:99,color:"rgba(196,181,253,1)",boxShadow:"0 0 10px rgba(139,92,246,0.35)"}}>ADMIN</span>}
+              </div>
             </div>
           </div>
           <div style={{padding:"8px",display:"flex",flexDirection:"column",gap:3}}>
@@ -774,6 +780,142 @@ function NavUserMenu({ user, onLogout, onSubmit, onRequestDeleteAccount }) {
           </div>
         </div>}
       </div>
+    </div>
+  );
+}
+
+/* ── AdminPanel ──────────────────────────────────────────── */
+function AdminPanel({ students, sessions, onDeleteSession, onDeleteTrader }) {
+  const [expandedUser, setExpandedUser] = useState(null);
+  const [lightbox, setLightbox] = useState(null);
+  const [confirmDel, setConfirmDel] = useState(null); // {sessionId, userId}
+  const [confirmDelTrader, setConfirmDelTrader] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  return (
+    <div style={{padding:"24px 32px 40px",maxWidth:1200,margin:"0 auto",animation:"fadeIn 0.4s ease"}}>
+      {/* Header */}
+      <div style={{marginBottom:"1.5rem",display:"flex",alignItems:"center",gap:14}}>
+        <div style={{width:44,height:44,borderRadius:13,background:"linear-gradient(135deg,rgba(139,92,246,0.2),rgba(99,102,241,0.12))",border:"1px solid rgba(139,92,246,0.35)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 0 24px rgba(139,92,246,0.25)"}}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinejoin="round"/></svg>
+        </div>
+        <div>
+          <h1 style={{margin:0,fontSize:32,fontWeight:800,fontFamily:SANS,letterSpacing:"-0.04em",color:"#fff"}}>Admin Panel</h1>
+          <p style={{margin:"3px 0 0",fontSize:10,fontFamily:MONO,color:"rgba(255,255,255,0.2)",letterSpacing:"0.1em"}}>FULL ACCESS · {students.length} TRADERS · {sessions.length} SESSIONS</p>
+        </div>
+      </div>
+
+      {/* Traders list */}
+      {students.map(trader=>{
+        const traderSessions = sessions.filter(s=>s.user_id===trader.id);
+        const isExpanded = expandedUser===trader.id;
+        return (
+          <div key={trader.id} style={{marginBottom:12,border:`1px solid ${isExpanded?"rgba(139,92,246,0.25)":"rgba(255,255,255,0.06)"}`,borderRadius:16,overflow:"hidden",background:"rgba(10,8,22,0.9)",transition:"border-color 0.2s"}}>
+            {/* Trader header row */}
+            <div onClick={()=>setExpandedUser(isExpanded?null:trader.id)}
+              style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 20px",cursor:"pointer",background:isExpanded?"rgba(139,92,246,0.06)":"transparent",transition:"background 0.2s"}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <Avatar name={trader.name} pic={trader.pic} size={38}/>
+                <div>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:15,fontWeight:700,fontFamily:SANS,color:"#fff",letterSpacing:"-0.02em"}}>{trader.name}</span>
+                    {trader.role==="admin"&&<span style={{fontSize:9,fontFamily:MONO,fontWeight:700,padding:"2px 7px",background:"linear-gradient(135deg,rgba(139,92,246,0.25),rgba(99,102,241,0.15))",border:"1px solid rgba(139,92,246,0.45)",borderRadius:99,color:"rgba(196,181,253,0.95)",boxShadow:"0 0 10px rgba(139,92,246,0.3)"}}>ADMIN</span>}
+                  </div>
+                  <div style={{fontSize:10,fontFamily:MONO,color:"rgba(255,255,255,0.3)",marginTop:2}}>{traderSessions.length} session{traderSessions.length!==1?"s":""} · Total P&L: <span style={{color:trader.pnl>=0?"#34d399":"#fb7185",fontWeight:600}}>{fmt(trader.pnl)}</span></div>
+                </div>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <button onClick={e=>{e.stopPropagation();setConfirmDelTrader(trader);}}
+                  style={{padding:"6px 12px",borderRadius:8,background:"rgba(255,50,50,0.06)",border:"1px solid rgba(255,50,50,0.15)",color:"rgba(255,100,100,0.7)",fontFamily:MONO,fontSize:10,fontWeight:700,cursor:"pointer",transition:"all 0.2s"}}
+                  onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,50,50,0.14)";e.currentTarget.style.color="rgba(255,100,100,1)";}}
+                  onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,50,50,0.06)";e.currentTarget.style.color="rgba(255,100,100,0.7)";}}>
+                  DELETE USER
+                </button>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{transform:isExpanded?"rotate(180deg)":"rotate(0deg)",transition:"transform 0.2s",flexShrink:0}}><path d="M6 9l6 6 6-6" stroke="rgba(255,255,255,0.3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </div>
+            </div>
+
+            {/* Sessions */}
+            {isExpanded&&<div style={{borderTop:"1px solid rgba(255,255,255,0.05)",padding:"12px 20px",display:"flex",flexDirection:"column",gap:10}}>
+              {traderSessions.length===0
+                ?<div style={{textAlign:"center",padding:"24px",fontFamily:MONO,fontSize:11,color:"rgba(255,255,255,0.15)"}}>NO SESSIONS YET</div>
+                :traderSessions.map(s=>{
+                  const isWin=s.pnl>=0; const wr=s.trades>0?(s.wins/s.trades)*100:0;
+                  return (
+                    <div key={s.id} style={{background:"rgba(255,255,255,0.02)",border:`1px solid ${isWin?"rgba(52,211,153,0.1)":"rgba(251,113,133,0.08)"}`,borderRadius:12,overflow:"hidden"}}>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",flexWrap:"wrap",gap:8}}>
+                        <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                          <div style={{width:6,height:6,borderRadius:"50%",background:isWin?"#34d399":"#fb7185",boxShadow:`0 0 6px ${isWin?"#34d399":"#fb7185"}`,flexShrink:0}}/>
+                          <span style={{fontFamily:MONO,fontSize:10,color:"rgba(255,255,255,0.3)"}}>{s.date}</span>
+                          {s.hide_pnl&&<span style={{fontSize:9,fontFamily:MONO,color:"rgba(139,92,246,0.5)",padding:"1px 6px",border:"1px solid rgba(139,92,246,0.15)",borderRadius:99}}>PRIVATE</span>}
+                          <span style={{fontFamily:MONO,fontSize:16,fontWeight:700,color:isWin?"#34d399":"#fb7185",textShadow:`0 0 12px ${isWin?"#34d39955":"#fb718555"}`}}>{fmt(s.pnl)}</span>
+                          <span style={{fontFamily:MONO,fontSize:11,color:"rgba(255,255,255,0.4)"}}>{s.trades} trades · {s.wins} wins · {wr.toFixed(0)}%</span>
+                        </div>
+                        <button onClick={()=>setConfirmDel({sessionId:s.id,userId:s.user_id})}
+                          style={{padding:"5px 10px",borderRadius:7,background:"rgba(255,50,50,0.06)",border:"1px solid rgba(255,50,50,0.15)",color:"rgba(255,100,100,0.65)",fontFamily:MONO,fontSize:10,fontWeight:700,cursor:"pointer",transition:"all 0.2s",flexShrink:0}}
+                          onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,50,50,0.14)";e.currentTarget.style.color="rgba(255,100,100,1)";}}
+                          onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,50,50,0.06)";e.currentTarget.style.color="rgba(255,100,100,0.65)";}}>
+                          DELETE
+                        </button>
+                      </div>
+                      {/* Proof screenshots */}
+                      {s.proof_urls?.length>0&&<div style={{padding:"0 16px 12px",display:"flex",gap:8,flexWrap:"wrap"}}>
+                        {s.proof_urls.map((src,j)=>(
+                          <img key={j} src={src} onClick={()=>setLightbox(src)}
+                            style={{width:80,height:80,objectFit:"cover",borderRadius:8,cursor:"pointer",border:"1px solid rgba(255,255,255,0.08)",transition:"all 0.2s"}}
+                            onMouseEnter={e=>{e.currentTarget.style.border="1px solid rgba(139,92,246,0.5)";e.currentTarget.style.transform="scale(1.05)";}}
+                            onMouseLeave={e=>{e.currentTarget.style.border="1px solid rgba(255,255,255,0.08)";e.currentTarget.style.transform="scale(1)";}}/>
+                        ))}
+                      </div>}
+                    </div>
+                  );
+                })}
+            </div>}
+          </div>
+        );
+      })}
+
+      {/* Lightbox */}
+      {lightbox&&<div onClick={()=>setLightbox(null)} style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.92)",backdropFilter:"blur(12px)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <img src={lightbox} style={{maxWidth:"92vw",maxHeight:"90vh",borderRadius:12,boxShadow:"0 0 80px rgba(0,0,0,0.8)"}} onClick={e=>e.stopPropagation()}/>
+        <button onClick={()=>setLightbox(null)} style={{position:"fixed",top:20,right:24,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:"50%",width:38,height:38,color:"#fff",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+      </div>}
+
+      {/* Delete session confirm */}
+      {confirmDel&&<div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.8)",backdropFilter:"blur(16px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}} onClick={()=>!busy&&setConfirmDel(null)}>
+        <div onClick={e=>e.stopPropagation()} className="modal-enter" style={{position:"relative",background:"linear-gradient(145deg,rgba(13,10,26,0.99),rgba(8,8,18,0.99))",border:"1px solid rgba(255,60,60,0.2)",borderRadius:24,padding:"32px",width:380,maxWidth:"92vw",textAlign:"center",overflow:"hidden",boxShadow:"0 0 60px rgba(255,60,60,0.12),0 40px 80px rgba(0,0,0,0.7)"}}>
+          <div style={{position:"absolute",top:"-40px",right:"-40px",width:"140px",height:"140px",borderRadius:"50%",background:"radial-gradient(circle,rgba(255,60,60,0.15),transparent 65%)",pointerEvents:"none"}}/>
+          <div style={{fontSize:20,fontWeight:700,fontFamily:SANS,color:"#fff",marginBottom:8}}>Delete this session?</div>
+          <div style={{fontSize:13,fontFamily:SANS,color:"rgba(255,255,255,0.35)",marginBottom:24,lineHeight:1.6}}>This will permanently remove the session and recalculate the trader's stats.</div>
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={()=>setConfirmDel(null)} style={{flex:1,padding:"12px",borderRadius:11,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",color:"rgba(255,255,255,0.5)",fontFamily:MONO,fontSize:12,fontWeight:700,cursor:"pointer"}}>CANCEL</button>
+            <button onClick={async()=>{setBusy(true);await onDeleteSession(confirmDel.sessionId,confirmDel.userId);setBusy(false);setConfirmDel(null);}} disabled={busy}
+              style={{flex:1,padding:"12px",borderRadius:11,background:"rgba(255,60,60,0.15)",border:"1px solid rgba(255,60,60,0.35)",color:"rgba(255,110,110,0.95)",fontFamily:MONO,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+              {busy?<><Spin/>DELETING...</>:"DELETE"}
+            </button>
+          </div>
+        </div>
+      </div>}
+
+      {/* Delete trader confirm */}
+      {confirmDelTrader&&<div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.8)",backdropFilter:"blur(16px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}} onClick={()=>!busy&&setConfirmDelTrader(null)}>
+        <div onClick={e=>e.stopPropagation()} className="modal-enter" style={{position:"relative",background:"linear-gradient(145deg,rgba(13,10,26,0.99),rgba(8,8,18,0.99))",border:"1px solid rgba(255,60,60,0.2)",borderRadius:24,padding:"32px",width:400,maxWidth:"92vw",textAlign:"center",overflow:"hidden",boxShadow:"0 0 60px rgba(255,60,60,0.12),0 40px 80px rgba(0,0,0,0.7)"}}>
+          <div style={{position:"absolute",top:"-40px",right:"-40px",width:"160px",height:"160px",borderRadius:"50%",background:"radial-gradient(circle,rgba(255,60,60,0.18),transparent 65%)",pointerEvents:"none"}}/>
+          <div style={{display:"flex",alignItems:"center",gap:10,justifyContent:"center",marginBottom:16}}>
+            <Avatar name={confirmDelTrader.name} pic={confirmDelTrader.pic} size={40}/>
+            <div style={{fontSize:18,fontWeight:700,fontFamily:SANS,color:"#fff"}}>{confirmDelTrader.name}</div>
+          </div>
+          <div style={{fontSize:20,fontWeight:700,fontFamily:SANS,color:"#fff",marginBottom:8}}>Delete this user?</div>
+          <div style={{fontSize:13,fontFamily:SANS,color:"rgba(255,255,255,0.35)",marginBottom:24,lineHeight:1.6}}>This will delete their account, all sessions, and remove them from the leaderboard. <span style={{color:"rgba(255,100,100,0.8)",fontWeight:600}}>Cannot be undone.</span></div>
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={()=>setConfirmDelTrader(null)} style={{flex:1,padding:"12px",borderRadius:11,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",color:"rgba(255,255,255,0.5)",fontFamily:MONO,fontSize:12,fontWeight:700,cursor:"pointer"}}>CANCEL</button>
+            <button onClick={async()=>{setBusy(true);await onDeleteTrader(confirmDelTrader.id);setBusy(false);setConfirmDelTrader(null);}} disabled={busy}
+              style={{flex:1,padding:"12px",borderRadius:11,background:"rgba(255,60,60,0.15)",border:"1px solid rgba(255,60,60,0.35)",color:"rgba(255,110,110,0.95)",fontFamily:MONO,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+              {busy?<><Spin/>DELETING...</>:"YES, DELETE USER"}
+            </button>
+          </div>
+        </div>
+      </div>}
     </div>
   );
 }
@@ -804,7 +946,7 @@ function App() {
     SUPA.auth.getSession().then(async({data:{session}})=>{
       if(session){
         const {data:p}=await SUPA.from('profiles').select('*').eq('id',session.user.id).single();
-        if(p) setUser({name:p.display_name,pic:p.avatar_url,id:session.user.id,email:session.user.email});
+        if(p) setUser({name:p.display_name,pic:p.avatar_url,id:session.user.id,email:session.user.email,role:p.role||'member'});
       }
       setAppLoading(false);
     });
@@ -814,7 +956,7 @@ function App() {
   const fetchLeaderboard = async () => {
     const {data}=await SUPA.from('traders').select('*').order('pnl',{ascending:false});
     if(data){
-      const mapped = data.map(t=>computeStats({id:t.id,name:t.display_name,pic:t.avatar_url,pnl:t.pnl,trades:t.trades,wins:t.wins,hidePnl:t.hide_pnl}));
+      const mapped = data.map(t=>computeStats({id:t.id,name:t.display_name,pic:t.avatar_url,pnl:t.pnl,trades:t.trades,wins:t.wins,hidePnl:t.hide_pnl,role:t.role||'member'}));
       setStudents(prev=>{ setPrevStudents(prev); return mapped; });
       setLastSync(new Date());
     }
@@ -891,24 +1033,33 @@ function App() {
     } catch(e) { setToast({msg:e.message||"Delete failed.",isError:true}); }
   };
 
-  const handleDeleteSession = async (sessionId) => {
+  const handleDeleteSession = async (sessionId, targetUserId) => {
+    const uid = targetUserId || user.id;
     try {
       const {error} = await SUPA.from('sessions').delete().eq('id', sessionId);
       if(error) throw error;
-      // Recalculate trader totals from remaining sessions
-      const {data:remaining, error:fetchErr} = await SUPA.from('sessions').select('*').eq('user_id', user.id);
+      const {data:remaining, error:fetchErr} = await SUPA.from('sessions').select('*').eq('user_id', uid);
       if(fetchErr) throw fetchErr;
       const pnl   = (remaining||[]).reduce((a,s)=>a+(s.pnl||0),0);
       const trades= (remaining||[]).reduce((a,s)=>a+(s.trades||0),0);
       const wins  = (remaining||[]).reduce((a,s)=>a+(s.wins||0),0);
-      await SUPA.from('traders').update({pnl,trades,wins}).eq('id',user.id);
+      await SUPA.from('traders').update({pnl,trades,wins}).eq('id',uid);
       await fetchLeaderboard();
       await fetchSessions();
       setToast({msg:"Session deleted."});
     } catch(e) { console.error("Delete session error:",e); setToast({msg:e.message||"Delete failed.",isError:true}); }
   };
 
-  const handleSubmit = async (data) => {
+  const handleDeleteTrader = async (traderId) => {
+    try {
+      await SUPA.from('sessions').delete().eq('user_id', traderId);
+      await SUPA.from('traders').delete().eq('id', traderId);
+      await SUPA.from('profiles').delete().eq('id', traderId);
+      await fetchLeaderboard();
+      await fetchSessions();
+      setToast({msg:"User deleted."});
+    } catch(e) { setToast({msg:e.message||"Delete failed.",isError:true}); }
+  };
     const uid=user.id;
     try {
       /* upload screenshots to Supabase Storage */
@@ -979,6 +1130,7 @@ function App() {
             {[
               {id:"leaderboard",label:"Leaderboard",icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="12" width="4" height="10" rx="1" stroke="currentColor" strokeWidth="1.8"/><rect x="9" y="7" width="4" height="15" rx="1" stroke="currentColor" strokeWidth="1.8"/><rect x="16" y="2" width="4" height="20" rx="1" stroke="currentColor" strokeWidth="1.8"/></svg>},
               {id:"pnllogs",label:"PnL Logs",icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><line x1="9" y1="13" x2="15" y2="13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><line x1="9" y1="17" x2="13" y2="17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>,badge:myCount},
+              ...(user?.role==="admin"?[{id:"admin",label:"Admin",icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="rgba(139,92,246,0.9)" strokeWidth="1.8" strokeLinejoin="round"/></svg>,isAdmin:true}]:[]),
             ].map(tab=>{
               const active=activePage===tab.id;
               return <button key={tab.id} onClick={()=>setActivePage(tab.id)} style={{display:"flex",alignItems:"center",gap:6,padding:"0 12px",height:60,background:"none",border:"none",cursor:"pointer",position:"relative",color:active?"rgba(196,181,253,0.95)":"rgba(255,255,255,0.3)",fontFamily:MONO,fontSize:12,fontWeight:600,letterSpacing:"0.05em",transition:"color 0.2s",flexShrink:0,minWidth:44}}
@@ -1000,7 +1152,9 @@ function App() {
         </div>
 
         {/* PAGE */}
-        {activePage==="pnllogs"&&user
+        {activePage==="admin"&&user?.role==="admin"
+          ?<AdminPanel students={students} sessions={sessions} onDeleteSession={handleDeleteSession} onDeleteTrader={handleDeleteTrader}/>
+          :activePage==="pnllogs"&&user
           ?<PnlLogs user={user} sessions={sessions} onDeleteSession={handleDeleteSession}/>
           :<div className="page-wrap" style={{padding:"24px 32px 40px",maxWidth:1200,margin:"0 auto",width:"100%"}}>
             {/* Header row */}
