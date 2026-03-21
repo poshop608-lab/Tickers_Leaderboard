@@ -932,10 +932,24 @@ function AdminPanel({ students, sessions, onDeleteSession, onDeleteTrader }) {
   const approveUser = async (profile) => {
     setApprovingId(profile.id);
     try {
+      // Update profile status to approved
       await SUPA.from('profiles').update({status:'approved'}).eq('id',profile.id);
-      await SUPA.from('traders').insert({id:profile.id,username:profile.username,display_name:profile.display_name,avatar_url:profile.avatar_url,pnl:0,trades:0,wins:0,hide_pnl:false,role:'member'});
+      // Create trader row — check if exists first
+      const {data:existing} = await SUPA.from('traders').select('id').eq('id',profile.id).maybeSingle();
+      if(!existing) {
+        await SUPA.from('traders').insert({
+          id:profile.id,
+          username:profile.username,
+          display_name:profile.display_name,
+          avatar_url:profile.avatar_url,
+          pnl:0, trades:0, wins:0,
+          hide_pnl:false,
+          role:'member',
+          rr_made:0
+        });
+      }
       setPending(p=>p.filter(x=>x.id!==profile.id));
-    } catch(e) { console.error(e); }
+    } catch(e) { console.error('Approve error:',e); }
     setApprovingId(null);
   };
 
@@ -1156,7 +1170,7 @@ function App() {
     try {
       const {data}=await SUPA.from('traders').select('*').order('pnl',{ascending:false});
       if(data){
-        const mapped = data.map(t=>computeStats({id:t.id,name:t.display_name,pic:t.avatar_url,pnl:t.pnl,trades:t.trades,wins:t.wins,hidePnl:t.hide_pnl,role:t.role||'member',rrMade:t.rr_made||0}));
+        const mapped = data.filter(t=>t&&t.id&&t.display_name).map(t=>computeStats({id:t.id,name:t.display_name,pic:t.avatar_url,pnl:t.pnl||0,trades:t.trades||0,wins:t.wins||0,hidePnl:t.hide_pnl,role:t.role||'member',rrMade:t.rr_made||0}));
         setStudents(prev=>{ setPrevStudents(prev); return mapped; });
         setLastSync(new Date());
       }
