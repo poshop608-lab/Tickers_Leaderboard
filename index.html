@@ -353,7 +353,7 @@ const LoginScreen = React.memo(function LoginScreen({ onLogin, onClose }) {
   const [pendingUid,setPendingUid]   = useState(null);
   const fileRef = useRef();
 
-  // Poll every 4 seconds when on pending screen — auto-login when approved
+  // Poll every 3 seconds when on pending screen — auto-login when approved
   useEffect(()=>{
     if(mode!=="pending"||!pendingUid) return;
     const poll = setInterval(async()=>{
@@ -361,10 +361,22 @@ const LoginScreen = React.memo(function LoginScreen({ onLogin, onClose }) {
         const {data:p} = await SUPA.from('profiles').select('*').eq('id',pendingUid).single();
         if(p && p.status==='approved') {
           clearInterval(poll);
-          onLogin({name:p.display_name, pic:p.avatar_url, id:p.id, email:p.email, role:p.role||'member'});
+          // Wait a moment for trader row to be created
+          setTimeout(async()=>{
+            // Check trader row exists
+            const {data:trader} = await SUPA.from('traders').select('*').eq('id',pendingUid).maybeSingle();
+            if(trader) {
+              onLogin({name:p.display_name, pic:p.avatar_url, id:p.id, email:p.email, role:p.role||'member'});
+            } else {
+              // Trader row not created yet, wait another second
+              setTimeout(async()=>{
+                onLogin({name:p.display_name, pic:p.avatar_url, id:p.id, email:p.email, role:p.role||'member'});
+              }, 2000);
+            }
+          }, 1500);
         }
       } catch(e){}
-    }, 4000);
+    }, 3000);
     return()=>clearInterval(poll);
   },[mode,pendingUid]);
 
@@ -954,21 +966,23 @@ function AdminPanel({ students, sessions, onDeleteSession, onDeleteTrader }) {
   const approveUser = async (profile) => {
     setApprovingId(profile.id);
     try {
-      await SUPA.from('profiles').update({status:'approved'}).eq('id',profile.id);
+      // Create trader row FIRST so it exists when user polls for approval
       const {data:existing} = await SUPA.from('traders').select('id').eq('id',profile.id).maybeSingle();
       if(!existing) {
         const {error} = await SUPA.from('traders').insert({
-          id:          profile.id,
-          username:    profile.username,
-          display_name:profile.display_name,
-          avatar_url:  profile.avatar_url,
+          id:           profile.id,
+          username:     profile.username,
+          display_name: profile.display_name,
+          avatar_url:   profile.avatar_url,
           pnl:0, trades:0, wins:0,
           hide_pnl:false,
           role:'member',
           rr_made:0
         });
-        if(error) { console.error('Trader insert error:',error); }
+        if(error) console.error('Trader insert error:',error);
       }
+      // THEN update status — this is what the poll detects
+      await SUPA.from('profiles').update({status:'approved'}).eq('id',profile.id);
       setPending(p=>p.filter(x=>x.id!==profile.id));
     } catch(e) { console.error('Approve error:',e); }
     setApprovingId(null);
