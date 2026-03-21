@@ -1411,6 +1411,8 @@ function App() {
     fetchLeaderboard();
     setToast({msg:"Avatar updated!"});
   };
+
+  const handleSubmit = async (data) => {
     const uid=user.id;
     try {
       /* upload screenshots to Supabase Storage */
