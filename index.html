@@ -15,12 +15,20 @@
   @keyframes floatUp{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-20px)}}
   @keyframes fadeIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
   @keyframes fadeInScale{from{opacity:0;transform:scale(0.94)}to{opacity:1;transform:scale(1)}}
+  @keyframes fadeInDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes fadeOutScale{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(0.96)}}
   @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+  @keyframes slideInLeft{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
+  @keyframes slideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
   @keyframes spin{to{transform:rotate(360deg)}}
   @keyframes pulseGlow{0%,100%{opacity:0.5;transform:scale(1)}50%{opacity:1;transform:scale(1.08)}}
   @keyframes orbFloat{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-18px) scale(1.04)}}
   @keyframes shimmer{0%{background-position:-200% center}100%{background-position:200% center}}
   @keyframes borderGlow{0%,100%{box-shadow:0 0 20px rgba(139,92,246,0.3),0 0 60px rgba(139,92,246,0.1)}50%{box-shadow:0 0 40px rgba(139,92,246,0.6),0 0 100px rgba(139,92,246,0.2)}}
+  @keyframes tableFlash{0%{opacity:0;transform:translateY(8px)}60%{opacity:1;transform:translateY(-2px)}100%{opacity:1;transform:translateY(0)}}
+  @keyframes loginSlideUp{from{opacity:0;transform:translateY(40px) scale(0.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+  @keyframes loginSlideDown{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(-30px) scale(0.97)}}
+  @keyframes rowStagger{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:translateX(0)}}
 
   input[type=number]{-moz-appearance:textfield;}
   input[type=number]::-webkit-outer-spin-button,
@@ -147,10 +155,39 @@ function PrivacyBadge({ name }) {
 }
 
 /* ── StatCard ────────────────────────────────────────────── */
-function StatCard({ label, val, color, glow }) {
+function StatCard({ label, val, color, glow, spin, index=0 }) {
   const [hov,setHov]=useState(false);
+  const [displayed,setDisplayed]=useState(val);
+  const [animating,setAnimating]=useState(false);
+  const prevVal=useRef(val);
   const gc = glow||"rgba(139,92,246,";
-  const glowColor = glow||"rgba(139,92,246,0.6)";
+
+  const doSpin = (target) => {
+    if(!spin){ setDisplayed(target); return; }
+    setAnimating(true);
+    const chars="0123456789";
+    let frame=0;
+    const totalFrames=20;
+    const interval=setInterval(()=>{
+      frame++;
+      if(frame>=totalFrames){ clearInterval(interval); setDisplayed(target); setAnimating(false); return; }
+      const scrambled=target.split("").map(c=>{
+        if(/[0-9]/.test(c)&&frame<totalFrames-2) return chars[Math.floor(Math.random()*10)];
+        return c;
+      }).join("");
+      setDisplayed(scrambled);
+    },38);
+    return()=>clearInterval(interval);
+  };
+
+  useEffect(()=>{
+    if(prevVal.current===val) return;
+    prevVal.current=val;
+    doSpin(val);
+  },[val]);
+
+  useEffect(()=>{ doSpin(val); },[]);
+
   return (
     <div className="stat-card"
       onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
@@ -162,18 +199,22 @@ function StatCard({ label, val, color, glow }) {
         boxShadow:hov
           ?`0 0 60px ${gc}0.25),0 20px 40px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.08)`
           :`0 0 20px ${gc}0.08),0 4px 16px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.03)`,
-        transition:"all 0.3s cubic-bezier(0.34,1.56,0.64,1)"}}>
-      {/* Ambient orb — always visible, brighter on hover */}
+        transition:"all 0.3s cubic-bezier(0.34,1.56,0.64,1)",
+        animation:`fadeInDown 0.5s cubic-bezier(0.16,1,0.3,1) ${index*70}ms both`}}>
       <div style={{position:"absolute",top:-50,right:-50,width:130,height:130,borderRadius:"50%",
         background:glow?`radial-gradient(circle,${glow}44,transparent 65%)`:"radial-gradient(circle,rgba(139,92,246,0.22),transparent 65%)",
         filter:"blur(18px)",opacity:hov?1:0.6,transition:"opacity 0.3s",pointerEvents:"none"}}/>
       <div style={{fontSize:8,fontFamily:MONO,color:"rgba(255,255,255,0.3)",marginBottom:8,letterSpacing:"0.14em",position:"relative",textTransform:"uppercase"}}>{label}</div>
       <div style={{fontSize:24,fontWeight:700,fontFamily:MONO,position:"relative",
-        color:color||(hov?"#fff":"rgba(255,255,255,0.92)"),
-        textShadow:hov
+        color:animating?"rgba(139,92,246,0.8)":(color||(hov?"#fff":"rgba(255,255,255,0.92)")),
+        textShadow:animating?"0 0 20px rgba(139,92,246,0.9)":hov
           ?`0 0 30px ${glow||"rgba(139,92,246,1)"}`
           :glow?`0 0 16px ${glow}88`:`0 0 12px rgba(139,92,246,0.3)`,
-        transition:"all 0.3s",letterSpacing:"-0.02em"}}>{val}</div>
+        transition:"color 0.1s,text-shadow 0.15s",
+        letterSpacing:"-0.02em",
+        filter:animating?"blur(0.3px)":"none"}}>
+        {displayed||val}
+      </div>
     </div>
   );
 }
@@ -297,39 +338,27 @@ const LoginScreen = React.memo(function LoginScreen({ onLogin, onClose }) {
   const reset = m => { setMode(m);setErr("");setUsername("");setEmail("");setPassword("");setConfirm("");setPreview(null); };
 
   const doRegister = async () => {
-    console.log("🔵 doRegister called");
     setErr("");
-    if(!preview)               { console.log("❌ no preview"); return setErr("Profile picture is required."); }
-    if(!username.trim())       { console.log("❌ no username"); return setErr("Username is required."); }
-    if(username.trim().length<3) { console.log("❌ username too short"); return setErr("Username must be at least 3 characters."); }
-    if(!/\S+@\S+\.\S+/.test(email)) { console.log("❌ bad email"); return setErr("Enter a valid email address."); }
-    if(password.length<6)      { console.log("❌ password too short"); return setErr("Password must be at least 6 characters."); }
-    if(password!==confirm)     { console.log("❌ passwords don't match"); return setErr("Passwords don't match."); }
-    console.log("✅ Validation passed, starting signup...");
+    if(!preview)               return setErr("Profile picture is required.");
+    if(!username.trim())       return setErr("Username is required.");
+    if(username.trim().length<3) return setErr("Username must be at least 3 characters.");
+    if(!/\S+@\S+\.\S+/.test(email)) return setErr("Enter a valid email address.");
+    if(password.length<6)      return setErr("Password must be at least 6 characters.");
+    if(password!==confirm)     return setErr("Passwords don't match.");
     setLoading(true);
     try {
-      console.log("🔵 Checking username duplicate...");
-      const { data:ex, error:exErr } = await SUPA.from('profiles').select('id').eq('username',username.trim().toLowerCase()).maybeSingle();
-      console.log("Username check result:", ex, exErr);
+      const { data:ex } = await SUPA.from('profiles').select('id').eq('username',username.trim().toLowerCase()).maybeSingle();
       if(ex) { setLoading(false); return setErr("Username already taken."); }
-      console.log("🔵 Calling signUp...");
       const { data:auth,error:authErr } = await SUPA.auth.signUp({ email, password });
-      console.log("SignUp result:", auth, authErr);
       if(authErr) { setLoading(false); return setErr(authErr.message); }
-      if(!auth || !auth.user) { setLoading(false); return setErr("✉️ Check your email — a confirmation link was sent. Click it, then sign in."); }
+      if(!auth || !auth.user) { setLoading(false); return setErr("✉️ Check your email — a confirmation link was sent."); }
       const uid = auth.user.id;
-      console.log("🔵 Uploading avatar for uid:", uid);
       const avatarUrl = await uploadImg(preview, `avatars/${uid}.jpg`);
-      console.log("✅ Avatar uploaded:", avatarUrl);
-      console.log("🔵 Inserting profile...");
-      const {error:profErr} = await SUPA.from('profiles').insert({ id:uid, username:username.trim().toLowerCase(), display_name:username.trim(), avatar_url:avatarUrl, email });
-      console.log("Profile insert error:", profErr);
-      console.log("🔵 Inserting trader...");
-      const {error:traderErr} = await SUPA.from('traders').insert({ id:uid, username:username.trim().toLowerCase(), display_name:username.trim(), avatar_url:avatarUrl, pnl:0, trades:0, wins:0, hide_pnl:false });
-      console.log("Trader insert error:", traderErr);
-      console.log("✅ All done, logging in!");
-      onLogin({ name:username.trim(), pic:avatarUrl, id:uid, email, role:'member' });
-    } catch(e) { setLoading(false); setErr(e.message||"Something went wrong."); console.error("❌ Register error:", e); }
+      await SUPA.from('profiles').insert({ id:uid, username:username.trim().toLowerCase(), display_name:username.trim(), avatar_url:avatarUrl, email, status:'pending', role:'member' });
+      // Don't create trader row yet — only after approval
+      setLoading(false);
+      setMode("pending"); // Show pending screen
+    } catch(e) { setLoading(false); setErr(e.message||"Something went wrong."); }
   };
 
   const doLogin = async () => {
@@ -342,6 +371,11 @@ const LoginScreen = React.memo(function LoginScreen({ onLogin, onClose }) {
       if(error) { setLoading(false); return setErr("Incorrect email or password."); }
       const { data:profile } = await SUPA.from('profiles').select('*').eq('id',auth.user.id).single();
       if(!profile) { setLoading(false); return setErr("Profile not found. Please register."); }
+      if(profile.status==='pending') {
+        await SUPA.auth.signOut();
+        setLoading(false);
+        return setMode("pending");
+      }
       onLogin({ name:profile.display_name, pic:profile.avatar_url, id:auth.user.id, email, role:profile.role||'member' });
     } catch(e) { setLoading(false); setErr(e.message||"Something went wrong."); }
   };
@@ -360,7 +394,7 @@ const LoginScreen = React.memo(function LoginScreen({ onLogin, onClose }) {
     borderRadius:28,
     padding:"2.5rem",
     boxShadow:"0 0 0 1px rgba(139,92,246,0.05),0 0 80px rgba(139,92,246,0.18),0 0 160px rgba(139,92,246,0.07),inset 0 1px 0 rgba(255,255,255,0.07),0 50px 100px rgba(0,0,0,0.7)",
-    animation:"fadeInScale 0.35s cubic-bezier(0.16,1,0.3,1)"
+    animation:"loginSlideUp 0.5s cubic-bezier(0.16,1,0.3,1)"
   };
   const Logo = () => (
     <div style={{display:"flex",alignItems:"center",gap:11,marginBottom:"2.2rem"}}>
@@ -407,27 +441,54 @@ const LoginScreen = React.memo(function LoginScreen({ onLogin, onClose }) {
       {onClose&&<button onClick={onClose} style={{position:"fixed",top:20,right:20,zIndex:400,width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.5)",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}
         onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.12)";e.currentTarget.style.color="#fff";}}
         onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.06)";e.currentTarget.style.color="rgba(255,255,255,0.5)";}}>✕</button>}
-      {BG}
       <div style={{minHeight:"100%",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}}>
         <div style={{...card}}>
           <Logo/>
-          <div style={{fontSize:32,fontWeight:800,color:"#fff",marginBottom:6,letterSpacing:"-0.04em",lineHeight:1.1}}>Welcome to <span className="glow-text">Tickers</span></div>
-          <div style={{fontSize:14,color:"rgba(255,255,255,0.3)",marginBottom:"2.5rem",lineHeight:1.6}}>The leaderboard for serious day traders.</div>
-          <button onClick={e=>{e.stopPropagation();reset("register");}}
-            style={{width:"100%",padding:"15px",marginBottom:10,background:"linear-gradient(135deg,rgba(139,92,246,0.18),rgba(99,102,241,0.12))",border:"1px solid rgba(139,92,246,0.35)",borderRadius:14,color:"rgba(196,181,253,0.95)",fontSize:13,fontFamily:MONO,fontWeight:700,letterSpacing:"0.08em",cursor:"pointer",boxShadow:"0 0 30px rgba(139,92,246,0.15),inset 0 1px 0 rgba(255,255,255,0.07)",transition:"all 0.25s"}}
-            onMouseEnter={e=>{e.currentTarget.style.background="linear-gradient(135deg,rgba(139,92,246,0.28),rgba(99,102,241,0.2))";e.currentTarget.style.boxShadow="0 0 50px rgba(139,92,246,0.35)";e.currentTarget.style.transform="translateY(-1px)";}} onMouseLeave={e=>{e.currentTarget.style.background="linear-gradient(135deg,rgba(139,92,246,0.18),rgba(99,102,241,0.12))";e.currentTarget.style.boxShadow="0 0 30px rgba(139,92,246,0.15)";e.currentTarget.style.transform="translateY(0)";}}>CREATE ACCOUNT →</button>
-          <button onClick={e=>{e.stopPropagation();reset("login");}}
-            style={{width:"100%",padding:"15px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,color:"rgba(255,255,255,0.45)",fontSize:13,fontFamily:MONO,fontWeight:600,letterSpacing:"0.08em",cursor:"pointer",transition:"all 0.2s"}}
-            onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.06)";e.currentTarget.style.color="rgba(255,255,255,0.8)";e.currentTarget.style.borderColor="rgba(255,255,255,0.14)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.03)";e.currentTarget.style.color="rgba(255,255,255,0.45)";e.currentTarget.style.borderColor="rgba(255,255,255,0.08)";}}>SIGN IN</button>
+          <div style={{fontSize:32,fontWeight:800,color:"#fff",marginBottom:6,letterSpacing:"-0.04em",lineHeight:1.1,animation:"slideUp 0.5s cubic-bezier(0.16,1,0.3,1) 0.1s both"}}>Welcome to <span className="glow-text">Tickers</span></div>
+          <div style={{fontSize:14,color:"rgba(255,255,255,0.3)",marginBottom:"2.5rem",lineHeight:1.6,animation:"slideUp 0.5s cubic-bezier(0.16,1,0.3,1) 0.18s both"}}>The leaderboard for serious day traders.</div>
+          <div style={{animation:"slideUp 0.5s cubic-bezier(0.16,1,0.3,1) 0.26s both"}}>
+            <button onClick={e=>{e.stopPropagation();reset("register");}}
+              style={{width:"100%",padding:"15px",marginBottom:10,background:"linear-gradient(135deg,rgba(139,92,246,0.18),rgba(99,102,241,0.12))",border:"1px solid rgba(139,92,246,0.35)",borderRadius:14,color:"rgba(196,181,253,0.95)",fontSize:13,fontFamily:MONO,fontWeight:700,letterSpacing:"0.08em",cursor:"pointer",boxShadow:"0 0 30px rgba(139,92,246,0.15),inset 0 1px 0 rgba(255,255,255,0.07)",transition:"all 0.25s"}}
+              onMouseEnter={e=>{e.currentTarget.style.background="linear-gradient(135deg,rgba(139,92,246,0.28),rgba(99,102,241,0.2))";e.currentTarget.style.boxShadow="0 0 50px rgba(139,92,246,0.35)";e.currentTarget.style.transform="translateY(-1px)";}} onMouseLeave={e=>{e.currentTarget.style.background="linear-gradient(135deg,rgba(139,92,246,0.18),rgba(99,102,241,0.12))";e.currentTarget.style.boxShadow="0 0 30px rgba(139,92,246,0.15)";e.currentTarget.style.transform="translateY(0)";}}>REQUEST ACCESS →</button>
+          </div>
+          <div style={{animation:"slideUp 0.5s cubic-bezier(0.16,1,0.3,1) 0.34s both"}}>
+            <button onClick={e=>{e.stopPropagation();reset("login");}}
+              style={{width:"100%",padding:"15px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,color:"rgba(255,255,255,0.45)",fontSize:13,fontFamily:MONO,fontWeight:600,letterSpacing:"0.08em",cursor:"pointer",transition:"all 0.2s"}}
+              onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.06)";e.currentTarget.style.color="rgba(255,255,255,0.8)";e.currentTarget.style.borderColor="rgba(255,255,255,0.14)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.03)";e.currentTarget.style.color="rgba(255,255,255,0.45)";e.currentTarget.style.borderColor="rgba(255,255,255,0.08)";}}>SIGN IN</button>
+          </div>
         </div>
       </div>
     </div>
   );
 
+  if(mode==="pending") return wrap(<>
+    <Logo/>
+    <div style={{textAlign:"center",padding:"8px 0 24px"}}>
+      <div style={{width:64,height:64,borderRadius:20,background:"linear-gradient(135deg,rgba(139,92,246,0.15),rgba(99,102,241,0.1))",border:"1px solid rgba(139,92,246,0.3)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 20px",boxShadow:"0 0 30px rgba(139,92,246,0.2)",animation:"pulseGlow 2.5s ease-in-out infinite"}}>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinejoin="round"/><polyline points="9,12 11,14 15,10" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      </div>
+      <div style={{fontSize:22,fontWeight:800,color:"#fff",marginBottom:10,letterSpacing:"-0.03em",animation:"slideUp 0.4s cubic-bezier(0.16,1,0.3,1) 0.1s both"}}>Access Request Submitted</div>
+      <div style={{fontSize:14,color:"rgba(255,255,255,0.35)",lineHeight:1.75,marginBottom:28,animation:"slideUp 0.4s cubic-bezier(0.16,1,0.3,1) 0.18s both"}}>
+        Your application is under review by our mentors.<br/>
+        <span style={{color:"rgba(196,181,253,0.6)"}}>You will be notified once approved</span> — this usually takes less than 24 hours.
+      </div>
+      <div style={{padding:"14px 18px",background:"rgba(139,92,246,0.06)",border:"1px solid rgba(139,92,246,0.15)",borderRadius:14,marginBottom:24,animation:"slideUp 0.4s cubic-bezier(0.16,1,0.3,1) 0.26s both"}}>
+        <div style={{fontSize:10,fontFamily:MONO,color:"rgba(255,255,255,0.2)",letterSpacing:"0.1em",marginBottom:6}}>STATUS</div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+          <span style={{width:8,height:8,borderRadius:"50%",background:"rgba(253,230,138,0.9)",boxShadow:"0 0 10px rgba(253,230,138,0.6)",display:"inline-block",animation:"pulseGlow 1.5s ease-in-out infinite"}}/>
+          <span style={{fontFamily:MONO,fontSize:13,fontWeight:700,color:"rgba(253,230,138,0.9)",letterSpacing:"0.06em"}}>PENDING REVIEW</span>
+        </div>
+      </div>
+      <button onClick={()=>reset("choose")} style={{width:"100%",padding:"13px",borderRadius:12,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",color:"rgba(255,255,255,0.4)",fontFamily:MONO,fontSize:12,fontWeight:700,cursor:"pointer",transition:"all 0.2s",animation:"slideUp 0.4s cubic-bezier(0.16,1,0.3,1) 0.34s both"}}
+        onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.08)";e.currentTarget.style.color="#fff";}}
+        onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.04)";e.currentTarget.style.color="rgba(255,255,255,0.4)";}}>← BACK TO LEADERBOARD</button>
+    </div>
+  </>);
+
   if(mode==="register") return wrap(<>
     <Logo/><BackBtn onClick={()=>reset("choose")}/>
-    <div style={{fontSize:26,fontWeight:800,color:"#fff",marginBottom:3,letterSpacing:"-0.04em"}}>Create account</div>
-    <div style={{fontSize:13,color:"rgba(255,255,255,0.28)",marginBottom:"1.5rem",lineHeight:1.5}}>Join the leaderboard. Set up your profile below.</div>
+    <div style={{fontSize:26,fontWeight:800,color:"#fff",marginBottom:3,letterSpacing:"-0.04em",animation:"slideUp 0.4s cubic-bezier(0.16,1,0.3,1) 0.05s both"}}>Create account</div>
+    <div style={{fontSize:13,color:"rgba(255,255,255,0.28)",marginBottom:"1.5rem",lineHeight:1.5,animation:"slideUp 0.4s cubic-bezier(0.16,1,0.3,1) 0.1s both"}}>Join the leaderboard. Set up your profile below.</div>
     {/* Profile pic */}
     <div style={{marginBottom:18}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
@@ -460,13 +521,15 @@ const LoginScreen = React.memo(function LoginScreen({ onLogin, onClose }) {
 
   return wrap(<>
     <Logo/><BackBtn onClick={()=>reset("choose")}/>
-    <div style={{fontSize:26,fontWeight:800,color:"#fff",marginBottom:3,letterSpacing:"-0.04em"}}>Welcome back</div>
-    <div style={{fontSize:13,color:"rgba(255,255,255,0.28)",marginBottom:"1.75rem",lineHeight:1.5}}>Sign in to your Tickers account.</div>
+    <div style={{fontSize:26,fontWeight:800,color:"#fff",marginBottom:3,letterSpacing:"-0.04em",animation:"slideUp 0.4s cubic-bezier(0.16,1,0.3,1) 0.05s both"}}>Welcome back</div>
+    <div style={{fontSize:13,color:"rgba(255,255,255,0.28)",marginBottom:"1.75rem",lineHeight:1.5,animation:"slideUp 0.4s cubic-bezier(0.16,1,0.3,1) 0.1s both"}}>Sign in to your Tickers account.</div>
+    <div style={{animation:"slideUp 0.4s cubic-bezier(0.16,1,0.3,1) 0.15s both"}}>
     <InputField label="EMAIL"    value={email}    onChange={setEmail}    placeholder="you@example.com" type="email"    onEnter={doLogin}/>
     <InputField label="PASSWORD" value={password} onChange={setPassword} placeholder="Your password"   type="password" onEnter={doLogin}/>
     <ErrBox msg={err}/>
     <PBtn onClick={doLogin} disabled={loading}>{loading?<><Spin/> SIGNING IN...</>:"SIGN IN →"}</PBtn>
     <div style={{marginTop:16,textAlign:"center",fontSize:12,fontFamily:SANS,color:"rgba(255,255,255,0.25)"}}>New here? <span onClick={()=>reset("register")} style={{color:"rgba(196,181,253,0.6)",cursor:"pointer",fontWeight:500}} onMouseEnter={e=>e.currentTarget.style.color="rgba(196,181,253,0.9)"} onMouseLeave={e=>e.currentTarget.style.color="rgba(196,181,253,0.6)"}>Create an account</span></div>
+    </div>
   </>);
 });
 
@@ -834,9 +897,39 @@ function NavUserMenu({ user, onLogout, onSubmit, onRequestDeleteAccount }) {
 function AdminPanel({ students, sessions, onDeleteSession, onDeleteTrader }) {
   const [expandedUser, setExpandedUser] = useState(null);
   const [lightbox, setLightbox] = useState(null);
-  const [confirmDel, setConfirmDel] = useState(null); // {sessionId, userId}
+  const [confirmDel, setConfirmDel] = useState(null);
   const [confirmDelTrader, setConfirmDelTrader] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState([]);
+  const [approvingId, setApprovingId] = useState(null);
+
+  useEffect(()=>{
+    fetchPending();
+  },[]);
+
+  const fetchPending = async () => {
+    const {data} = await SUPA.from('profiles').select('*').eq('status','pending');
+    setPending(data||[]);
+  };
+
+  const approveUser = async (profile) => {
+    setApprovingId(profile.id);
+    try {
+      await SUPA.from('profiles').update({status:'approved'}).eq('id',profile.id);
+      await SUPA.from('traders').insert({id:profile.id,username:profile.username,display_name:profile.display_name,avatar_url:profile.avatar_url,pnl:0,trades:0,wins:0,hide_pnl:false,role:'member'});
+      setPending(p=>p.filter(x=>x.id!==profile.id));
+    } catch(e) { console.error(e); }
+    setApprovingId(null);
+  };
+
+  const rejectUser = async (profile) => {
+    setApprovingId(profile.id);
+    try {
+      await SUPA.from('profiles').delete().eq('id',profile.id);
+      setPending(p=>p.filter(x=>x.id!==profile.id));
+    } catch(e) { console.error(e); }
+    setApprovingId(null);
+  };
 
   return (
     <div style={{padding:"24px 32px 40px",maxWidth:1200,margin:"0 auto",animation:"fadeIn 0.4s ease"}}>
@@ -850,6 +943,37 @@ function AdminPanel({ students, sessions, onDeleteSession, onDeleteTrader }) {
           <p style={{margin:"3px 0 0",fontSize:10,fontFamily:MONO,color:"rgba(255,255,255,0.2)",letterSpacing:"0.1em"}}>FULL ACCESS · {students.length} TRADERS · {sessions.length} SESSIONS</p>
         </div>
       </div>
+
+      {/* Pending Approvals */}
+      {pending.length>0&&<div style={{marginBottom:20,border:"1px solid rgba(253,230,138,0.2)",borderRadius:16,overflow:"hidden",background:"rgba(253,230,138,0.02)"}}>
+        <div style={{padding:"13px 20px",borderBottom:"1px solid rgba(253,230,138,0.1)",display:"flex",alignItems:"center",gap:8}}>
+          <span style={{width:7,height:7,borderRadius:"50%",background:"rgba(253,230,138,0.9)",boxShadow:"0 0 8px rgba(253,230,138,0.6)",display:"inline-block",animation:"pulseGlow 1.5s ease-in-out infinite"}}/>
+          <span style={{fontFamily:MONO,fontSize:11,fontWeight:700,color:"rgba(253,230,138,0.9)",letterSpacing:"0.08em"}}>PENDING APPROVALS — {pending.length}</span>
+        </div>
+        {pending.map(p=>(
+          <div key={p.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"13px 20px",borderBottom:"1px solid rgba(253,230,138,0.05)",flexWrap:"wrap",gap:10}}>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <Avatar name={p.display_name} pic={p.avatar_url} size={36}/>
+              <div>
+                <div style={{fontSize:14,fontWeight:700,fontFamily:SANS,color:"#fff"}}>{p.display_name}</div>
+                <div style={{fontSize:10,fontFamily:MONO,color:"rgba(255,255,255,0.3)",marginTop:2}}>{p.email}</div>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>approveUser(p)} disabled={approvingId===p.id}
+                style={{padding:"7px 14px",borderRadius:9,background:"rgba(52,211,153,0.1)",border:"1px solid rgba(52,211,153,0.3)",color:"rgba(52,211,153,0.9)",fontFamily:MONO,fontSize:11,fontWeight:700,cursor:"pointer",transition:"all 0.2s"}}
+                onMouseEnter={e=>{e.currentTarget.style.background="rgba(52,211,153,0.2)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(52,211,153,0.1)";}}>
+                {approvingId===p.id?"APPROVING...":"✓ APPROVE"}
+              </button>
+              <button onClick={()=>rejectUser(p)} disabled={approvingId===p.id}
+                style={{padding:"7px 14px",borderRadius:9,background:"rgba(255,60,60,0.06)",border:"1px solid rgba(255,60,60,0.2)",color:"rgba(255,100,100,0.7)",fontFamily:MONO,fontSize:11,fontWeight:700,cursor:"pointer",transition:"all 0.2s"}}
+                onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,60,60,0.14)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,60,60,0.06)";}}>
+                ✕ REJECT
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>}
 
       {/* Traders list */}
       {students.map(trader=>{
@@ -983,35 +1107,50 @@ function App() {
   const [confirmDelAccount, setConfirmDelAccount] = useState(false);
   const [deletingAccount,   setDeletingAccount]   = useState(false);
   const [timeFilter,  setTimeFilter]  = useState("all");
+  const [tableKey,    setTableKey]    = useState(0);
   const [showLoginScreen, setShowLoginScreen] = useState(false);
+
+  const handleFilterChange = (id) => {
+    setTimeFilter(id);
+    setTableKey(k=>k+1);
+  };
 
   useEffect(()=>{ const t=setInterval(()=>setTick(x=>x+1),1000); return()=>clearInterval(t); },[]);
   const livePulse = Math.sin(tick*0.3)*0.4+0.6;
 
-  /* restore session on page load */
+  /* restore session on page load — don't block rendering */
   useEffect(()=>{
+    // Show app immediately, resolve auth in background
+    const timeout = setTimeout(()=>setAppLoading(false), 1500); // fallback
     SUPA.auth.getSession().then(async({data:{session}})=>{
       if(session){
-        const {data:p}=await SUPA.from('profiles').select('*').eq('id',session.user.id).single();
-        if(p) setUser({name:p.display_name,pic:p.avatar_url,id:session.user.id,email:session.user.email,role:p.role||'member'});
+        try {
+          const {data:p}=await SUPA.from('profiles').select('*').eq('id',session.user.id).single();
+          if(p) setUser({name:p.display_name,pic:p.avatar_url,id:session.user.id,email:session.user.email,role:p.role||'member'});
+        } catch(e) { console.log('Profile fetch error:', e); }
       }
+      clearTimeout(timeout);
       setAppLoading(false);
-    });
+    }).catch(()=>{ clearTimeout(timeout); setAppLoading(false); });
     SUPA.auth.onAuthStateChange((_,session)=>{ if(!session) setUser(null); });
   },[]);
 
   const fetchLeaderboard = async () => {
-    const {data}=await SUPA.from('traders').select('*').order('pnl',{ascending:false});
-    if(data){
-      const mapped = data.map(t=>computeStats({id:t.id,name:t.display_name,pic:t.avatar_url,pnl:t.pnl,trades:t.trades,wins:t.wins,hidePnl:t.hide_pnl,role:t.role||'member',rrMade:t.rr_made||0}));
-      setStudents(prev=>{ setPrevStudents(prev); return mapped; });
-      setLastSync(new Date());
-    }
+    try {
+      const {data}=await SUPA.from('traders').select('*').order('pnl',{ascending:false});
+      if(data){
+        const mapped = data.map(t=>computeStats({id:t.id,name:t.display_name,pic:t.avatar_url,pnl:t.pnl,trades:t.trades,wins:t.wins,hidePnl:t.hide_pnl,role:t.role||'member',rrMade:t.rr_made||0}));
+        setStudents(prev=>{ setPrevStudents(prev); return mapped; });
+        setLastSync(new Date());
+      }
+    } catch(e) { console.log('Leaderboard fetch error:', e); }
   };
 
   const fetchSessions = async () => {
-    const {data}=await SUPA.from('sessions').select('*').order('submitted_at',{ascending:false});
-    if(data) setSessions(data.map(s=>({...s,date:new Date(s.submitted_at).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})+" · "+new Date(s.submitted_at).toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"})})));
+    try {
+      const {data}=await SUPA.from('sessions').select('*').order('submitted_at',{ascending:false});
+      if(data) setSessions(data.map(s=>({...s,date:new Date(s.submitted_at).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})+" · "+new Date(s.submitted_at).toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"})})));
+    } catch(e) { console.log('Sessions fetch error:', e); }
   };
 
   useEffect(()=>{
@@ -1212,7 +1351,7 @@ function App() {
             {user
               ?<NavUserMenu user={user} onLogout={handleLogout} onSubmit={()=>setShowSub(true)} onRequestDeleteAccount={()=>setConfirmDelAccount(true)}/>
               :<button onClick={()=>setShowLoginScreen(true)}
-                style={{display:"flex",alignItems:"center",gap:7,padding:"7px 14px",background:"linear-gradient(135deg,rgba(139,92,246,0.18),rgba(99,102,241,0.12))",border:"1px solid rgba(139,92,246,0.35)",borderRadius:99,color:"rgba(196,181,253,0.95)",fontSize:11,cursor:"pointer",fontWeight:700,letterSpacing:"0.06em",fontFamily:MONO,boxShadow:"0 0 16px rgba(139,92,246,0.15)",transition:"all 0.2s",whiteSpace:"nowrap"}}
+                style={{display:"flex",alignItems:"center",gap:7,padding:"7px 14px",background:"linear-gradient(135deg,rgba(139,92,246,0.18),rgba(99,102,241,0.12))",border:"1px solid rgba(139,92,246,0.35)",borderRadius:99,color:"rgba(196,181,253,0.95)",fontSize:11,cursor:"pointer",fontWeight:700,letterSpacing:"0.06em",fontFamily:MONO,boxShadow:"0 0 16px rgba(139,92,246,0.15)",transition:"all 0.2s",whiteSpace:"nowrap",animation:"fadeIn 0.4s cubic-bezier(0.16,1,0.3,1)"}}
                 onMouseEnter={e=>{e.currentTarget.style.background="linear-gradient(135deg,rgba(139,92,246,0.28),rgba(99,102,241,0.2))";e.currentTarget.style.boxShadow="0 0 28px rgba(139,92,246,0.3)";}}
                 onMouseLeave={e=>{e.currentTarget.style.background="linear-gradient(135deg,rgba(139,92,246,0.18),rgba(99,102,241,0.12))";e.currentTarget.style.boxShadow="0 0 16px rgba(139,92,246,0.15)";}}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><polyline points="10,17 15,12 10,7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><line x1="15" y1="12" x2="3" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
@@ -1239,8 +1378,8 @@ function App() {
                 {[{id:"today",label:"Today"},{id:"week",label:"Week"},{id:"month",label:"Month"},{id:"all",label:"All Time"}].map(f=>{
                   const active=timeFilter===f.id;
                   return <button key={f.id}
-                    onClick={()=>setTimeFilter(f.id)}
-                    onTouchEnd={e=>{e.preventDefault();setTimeFilter(f.id);}}
+                    onClick={()=>handleFilterChange(f.id)}
+                    onTouchEnd={e=>{e.preventDefault();handleFilterChange(f.id);}}
                     style={{padding:"10px 18px",borderRadius:10,border:"none",
                       background:active?"linear-gradient(135deg,rgba(139,92,246,0.3),rgba(99,102,241,0.2))":"transparent",
                       color:active?"rgba(196,181,253,1)":"rgba(255,255,255,0.4)",
@@ -1258,22 +1397,30 @@ function App() {
             </div>
             {/* Stat cards */}
             <div className="stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:12,marginBottom:"1.25rem"}}>
-              <StatCard label="ACTIVE TRADERS" val={String(totals.active)}/>
-              <StatCard label="TOTAL P&L"      val={fmt(totals.pnl)}  color={totals.pnl>=0?G:R} glow={totals.pnl>=0?G:R}/>
-              <StatCard label="AVG WIN RATE"   val={pct(totals.wr)}/>
-              <StatCard label="TOTAL TRADES"   val={String(totals.trades)}/>
-              <StatCard label="RR MADE" val={totals.rr>0?totals.rr.toFixed(1)+"R":"—"}/>
+              {[
+                {label:"ACTIVE TRADERS", val:String(totals.active),                                          spin:false},
+                {label:"TOTAL P&L",      val:fmt(totals.pnl),      color:totals.pnl>=0?G:R, glow:totals.pnl>=0?G:R, spin:true},
+                {label:"AVG WIN RATE",   val:pct(totals.wr),                                                 spin:true},
+                {label:"TOTAL TRADES",   val:String(totals.trades),                                          spin:false},
+                {label:"RR MADE",        val:totals.rr>0?totals.rr.toFixed(1)+"R":"—",                      spin:true},
+              ].map((c,i)=>(
+                <StatCard key={c.label} {...c} index={i}/>
+              ))}
             </div>
             {/* Table */}
-            <div style={{border:"1px solid rgba(255,255,255,0.07)",borderRadius:16,overflow:"hidden",background:"rgba(10,8,22,0.9)"}}>
+            <div key={tableKey} style={{border:"1px solid rgba(255,255,255,0.07)",borderRadius:16,overflow:"hidden",background:"rgba(10,8,22,0.9)",animation:"tableFlash 0.4s cubic-bezier(0.16,1,0.3,1)"}}>
               <div className="table-header" style={{display:"grid",gridTemplateColumns:"44px 1fr 120px 95px 70px 90px 90px",padding:"11px 20px",borderBottom:"1px solid rgba(255,255,255,0.05)",fontFamily:MONO,fontSize:9,color:"rgba(255,255,255,0.18)",letterSpacing:"0.12em"}}>
                 <span>#</span><span>TRADER</span><span style={{textAlign:"right"}}>P&L</span><span className="hide-col" style={{textAlign:"right"}}>WIN %</span><span className="hide-col" style={{textAlign:"right"}}>TRADES</span><span className="hide-col" style={{textAlign:"right"}}>AVG RET</span><span className="hide-col" style={{textAlign:"right",color:"rgba(167,139,250,0.5)"}}>RR MADE</span>
               </div>
               {ranked.map((t,i)=>{
                 const prev=prevRanked.find(p=>p.id===t.id);
-                return <TraderRow key={t.id} t={t} prev={prev} isNew={newIds.has(t.id)} isSelected={selected?.id===t.id} onClick={()=>setSelected(selected?.id===t.id?null:t)} isLast={i===ranked.length-1}/>;
+                return (
+                  <div key={t.id} style={{animation:`rowStagger 0.35s cubic-bezier(0.16,1,0.3,1) ${i*45}ms both`}}>
+                    <TraderRow t={t} prev={prev} isNew={newIds.has(t.id)} isSelected={selected?.id===t.id} onClick={()=>setSelected(selected?.id===t.id?null:t)} isLast={i===ranked.length-1}/>
+                  </div>
+                );
               })}
-              {ranked.length===0&&<div style={{padding:"48px 24px",textAlign:"center",fontFamily:MONO,fontSize:11,color:"rgba(255,255,255,0.1)",letterSpacing:"0.1em"}}>NO TRADERS YET · BE THE FIRST</div>}
+              {ranked.length===0&&<div style={{padding:"48px 24px",textAlign:"center",fontFamily:MONO,fontSize:11,color:"rgba(255,255,255,0.1)",letterSpacing:"0.1em",animation:"fadeIn 0.4s ease"}}>NO TRADERS YET · BE THE FIRST</div>}
             </div>
             <div style={{marginTop:10,padding:"0 2px"}}>
               <span style={{fontSize:9,fontFamily:MONO,color:"rgba(255,255,255,0.2)",letterSpacing:"0.1em"}}>{ranked.length} TRADER{ranked.length!==1?"S":""}</span>
