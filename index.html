@@ -2,8 +2,21 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
 <title>Tickers Leaderboard</title>
+
+<!-- PWA -->
+<meta name="application-name" content="Tickers"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Tickers"/>
+<meta name="theme-color" content="#05050f"/>
+<meta name="description" content="Real-time day trader leaderboard"/>
+<link rel="manifest" href="/manifest.json"/>
+
+<!-- iOS icons -->
+<link rel="apple-touch-icon" href="/icon-192.png"/>
+
 <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.5/babel.min.js"></script>
@@ -1358,13 +1371,39 @@ function App() {
     if(!newAvatarPic) return;
     setUploadingAvatar(true);
     try {
-      const avatarUrl = await uploadImg(newAvatarPic, `avatars/${user.id}.jpg`);
-      await SUPA.from('profiles').update({avatar_url:avatarUrl}).eq('id',user.id);
-      await SUPA.from('traders').update({avatar_url:avatarUrl}).eq('id',user.id);
-      handleAvatarChange(avatarUrl);
+      // Convert base64 to blob
+      const res = await fetch(newAvatarPic);
+      const blob = await res.blob();
+      const path = `avatars/${user.id}.jpg`;
+      
+      // Upload to storage
+      const { error: uploadErr } = await SUPA.storage
+        .from('Tickers-Proofs')
+        .upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+      
+      if(uploadErr) throw new Error('Upload failed: ' + uploadErr.message);
+      
+      // Get public URL
+      const { data: urlData } = SUPA.storage
+        .from('Tickers-Proofs')
+        .getPublicUrl(path);
+      
+      const avatarUrl = urlData.publicUrl + '?t=' + Date.now(); // cache bust
+      
+      // Update DB
+      await SUPA.from('profiles').update({ avatar_url: avatarUrl }).eq('id', user.id);
+      await SUPA.from('traders').update({ avatar_url: avatarUrl }).eq('id', user.id);
+      
+      // Update local state
+      setUser(u=>({...u, pic: avatarUrl}));
+      fetchLeaderboard();
       setShowAvatarModal(false);
       setNewAvatarPic(null);
-    } catch(e){ setToast({msg:"Upload failed.",isError:true}); }
+      setToast({msg:"Avatar updated! ✓"});
+    } catch(e) {
+      console.error('Avatar upload error:', e);
+      setToast({msg: e.message || "Upload failed. Check storage permissions.", isError:true});
+    }
     setUploadingAvatar(false);
   };
 
@@ -1604,6 +1643,13 @@ function App() {
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  });
+}
 </script>
 </body>
 </html>
