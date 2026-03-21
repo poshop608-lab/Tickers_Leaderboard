@@ -164,39 +164,42 @@ function StatCard({ label, val, color, glow, spin, index=0 }) {
   const [hov,setHov]=useState(false);
   const [displayed,setDisplayed]=useState(val);
   const [animating,setAnimating]=useState(false);
-  const prevVal=useRef(val);
   const gc = glow||"rgba(139,92,246,";
+  const intervalRef=useRef(null);
 
   const doSpin = (target) => {
+    if(intervalRef.current) clearInterval(intervalRef.current);
     if(!spin){ setDisplayed(target); return; }
     const numMatch = target.match(/[\d.]+/);
-    if(!numMatch || parseFloat(numMatch[0])===0){ setDisplayed(target); return; }
+    const targetNum = numMatch ? parseFloat(numMatch[0]) : 0;
+    if(!numMatch || targetNum===0){ setDisplayed(target); return; }
     setAnimating(true);
-    const targetNum = parseFloat(numMatch[0]);
     const prefix = target.slice(0, numMatch.index);
     const suffix = target.slice(numMatch.index + numMatch[0].length);
-    const totalFrames = 40;
+    const totalFrames = 44;
     let frame = 0;
-    const interval = setInterval(()=>{
+    intervalRef.current = setInterval(()=>{
       frame++;
-      if(frame >= totalFrames){ clearInterval(interval); setDisplayed(target); setAnimating(false); return; }
-      const ease = 1 - Math.pow(1 - frame/totalFrames, 4); // quartic ease-out, very smooth
+      if(frame >= totalFrames){
+        clearInterval(intervalRef.current);
+        setDisplayed(target);
+        setAnimating(false);
+        return;
+      }
+      const ease = 1 - Math.pow(1 - frame/totalFrames, 4);
       const current = targetNum * ease;
       const formatted = suffix.includes('k')
         ? `${prefix}${(current/1000).toFixed(1)}k${suffix.replace('k','')}`
         : `${prefix}${Math.round(current)}${suffix}`;
       setDisplayed(formatted);
     }, 38);
-    return()=>clearInterval(interval);
   };
 
+  // Trigger spin whenever val changes (including first real data load)
   useEffect(()=>{
-    if(prevVal.current===val) return;
-    prevVal.current=val;
-    doSpin(val);
+    const t = setTimeout(()=>doSpin(val), index*70+50);
+    return()=>{ clearTimeout(t); if(intervalRef.current) clearInterval(intervalRef.current); };
   },[val]);
-
-  useEffect(()=>{ const t=setTimeout(()=>doSpin(val), index*70+100); return()=>clearTimeout(t); },[]);
 
   return (
     <div className="stat-card"
@@ -889,35 +892,11 @@ function PnlLogs({ user, sessions, onDeleteSession }) {
 }
 
 /* ── NavUserMenu ─────────────────────────────────────────── */
-function NavUserMenu({ user, onLogout, onSubmit, onRequestDeleteAccount, onAvatarChange }) {
+function NavUserMenu({ user, onLogout, onSubmit, onRequestDeleteAccount, onRequestChangeAvatar }) {
   const [open,setOpen]=useState(false);
-  const [showAvatarModal,setShowAvatarModal]=useState(false);
-  const [newPic,setNewPic]=useState(null);
-  const [uploading,setUploading]=useState(false);
   const ref=useRef();
-  const fileRef=useRef();
   useEffect(()=>{ const h=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false);}; document.addEventListener("mousedown",h); return()=>document.removeEventListener("mousedown",h); },[]);
   const hues=[258,280,240,310,265,250,295]; const h=hues[user.name.charCodeAt(0)%hues.length];
-
-  const handleAvatarPick = e => {
-    const f=e.target.files[0]; if(!f) return;
-    const r=new FileReader(); r.onload=ev=>setNewPic(ev.target.result); r.readAsDataURL(f);
-  };
-
-  const doAvatarUpload = async () => {
-    if(!newPic) return;
-    setUploading(true);
-    try {
-      const avatarUrl = await uploadImg(newPic, `avatars/${user.id}.jpg`);
-      await SUPA.from('profiles').update({avatar_url:avatarUrl}).eq('id',user.id);
-      await SUPA.from('traders').update({avatar_url:avatarUrl}).eq('id',user.id);
-      onAvatarChange(avatarUrl);
-      setShowAvatarModal(false);
-      setNewPic(null);
-    } catch(e){ console.error(e); }
-    setUploading(false);
-  };
-
   return (
     <div style={{display:"flex",alignItems:"center",gap:10}} ref={ref}>
       <button onClick={onSubmit} className="submit-btn" style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",background:"rgba(139,92,246,0.08)",border:"1px solid rgba(139,92,246,0.22)",borderRadius:99,color:"rgba(196,181,253,0.9)",fontSize:11,cursor:"pointer",fontWeight:600,letterSpacing:"0.05em",fontFamily:MONO,boxShadow:"0 0 16px rgba(139,92,246,0.1)",transition:"all 0.2s",whiteSpace:"nowrap"}}
@@ -930,12 +909,8 @@ function NavUserMenu({ user, onLogout, onSubmit, onRequestDeleteAccount, onAvata
         </div>
         {open&&<div style={{position:"absolute",top:"calc(100% + 12px)",right:0,minWidth:220,background:"linear-gradient(145deg,#0e0c1f,#09091a)",border:"1px solid rgba(139,92,246,0.2)",borderRadius:18,boxShadow:"0 20px 60px rgba(0,0,0,0.8),0 0 50px rgba(139,92,246,0.1),inset 0 1px 0 rgba(255,255,255,0.05)",overflow:"hidden",animation:"fadeIn 0.18s ease",zIndex:500}}>
           <div style={{padding:"15px 17px",borderBottom:"1px solid rgba(255,255,255,0.05)",display:"flex",alignItems:"center",gap:12,background:"rgba(139,92,246,0.05)"}}>
-            <div style={{position:"relative",flexShrink:0,cursor:"pointer"}} onClick={()=>{setOpen(false);setShowAvatarModal(true);}}>
+            <div style={{position:"relative",flexShrink:0,cursor:"pointer"}} onClick={()=>{setOpen(false);onRequestChangeAvatar();}}>
               <Avatar name={user.name} pic={user.pic} size={40}/>
-              <div style={{position:"absolute",inset:0,borderRadius:"50%",background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",opacity:0,transition:"opacity 0.2s"}}
-                onMouseEnter={e=>{e.currentTarget.style.opacity=1;}} onMouseLeave={e=>{e.currentTarget.style.opacity=0;}}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </div>
               <div style={{position:"absolute",bottom:1,right:1,width:10,height:10,borderRadius:"50%",background:G,border:"2px solid #09091a",boxShadow:`0 0 10px ${G}`}}/>
             </div>
             <div>
@@ -947,7 +922,7 @@ function NavUserMenu({ user, onLogout, onSubmit, onRequestDeleteAccount, onAvata
             </div>
           </div>
           <div style={{padding:"8px",display:"flex",flexDirection:"column",gap:3}}>
-            <button onClick={()=>{setOpen(false);setShowAvatarModal(true);}} style={{width:"100%",padding:"11px 14px",borderRadius:11,cursor:"pointer",background:"rgba(139,92,246,0.05)",border:"1px solid rgba(139,92,246,0.12)",color:"rgba(196,181,253,0.7)",fontFamily:MONO,fontSize:11,fontWeight:700,letterSpacing:"0.08em",display:"flex",alignItems:"center",gap:9,transition:"all 0.2s"}}
+            <button onClick={()=>{setOpen(false);onRequestChangeAvatar();}} style={{width:"100%",padding:"11px 14px",borderRadius:11,cursor:"pointer",background:"rgba(139,92,246,0.05)",border:"1px solid rgba(139,92,246,0.12)",color:"rgba(196,181,253,0.7)",fontFamily:MONO,fontSize:11,fontWeight:700,letterSpacing:"0.08em",display:"flex",alignItems:"center",gap:9,transition:"all 0.2s"}}
               onMouseEnter={e=>{e.currentTarget.style.background="rgba(139,92,246,0.12)";e.currentTarget.style.borderColor="rgba(139,92,246,0.3)";e.currentTarget.style.color="rgba(196,181,253,1)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(139,92,246,0.05)";e.currentTarget.style.borderColor="rgba(139,92,246,0.12)";e.currentTarget.style.color="rgba(196,181,253,0.7)";}}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
               CHANGE AVATAR
@@ -965,43 +940,6 @@ function NavUserMenu({ user, onLogout, onSubmit, onRequestDeleteAccount, onAvata
           </div>
         </div>}
       </div>
-
-      {/* Change Avatar Modal */}
-      {showAvatarModal&&<div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.82)",backdropFilter:"blur(18px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}} onClick={()=>!uploading&&(setShowAvatarModal(false),setNewPic(null))}>
-        <div onClick={e=>e.stopPropagation()} className="modal-enter" style={{position:"relative",background:"linear-gradient(145deg,rgba(13,10,26,0.99),rgba(8,8,18,0.99))",border:"1px solid rgba(139,92,246,0.22)",borderRadius:26,padding:"36px",width:400,maxWidth:"92vw",boxShadow:"0 0 0 1px rgba(139,92,246,0.06),0 0 80px rgba(139,92,246,0.15),0 50px 100px rgba(0,0,0,0.8)",overflow:"hidden",textAlign:"center"}}>
-          <div style={{position:"absolute",top:"-50px",right:"-50px",width:"180px",height:"180px",borderRadius:"50%",background:"radial-gradient(circle,rgba(139,92,246,0.18),transparent 65%)",pointerEvents:"none"}}/>
-          <div style={{fontSize:18,fontWeight:700,fontFamily:SANS,color:"#fff",marginBottom:6,letterSpacing:"-0.02em"}}>Change Avatar</div>
-          <div style={{fontSize:12,fontFamily:MONO,color:"rgba(255,255,255,0.25)",marginBottom:24,letterSpacing:"0.06em"}}>CHOOSE A NEW PROFILE PICTURE</div>
-
-          {/* Preview */}
-          <div style={{display:"flex",justifyContent:"center",marginBottom:20}}>
-            <div style={{position:"relative",width:88,height:88,borderRadius:"50%",overflow:"hidden",border:`3px solid ${newPic?"rgba(52,211,153,0.5)":"rgba(139,92,246,0.3)"}`,boxShadow:`0 0 24px ${newPic?"rgba(52,211,153,0.2)":"rgba(139,92,246,0.15)"}`,cursor:"pointer",transition:"all 0.25s"}} onClick={()=>fileRef.current.click()}>
-              {newPic
-                ?<img src={newPic} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                :<Avatar name={user.name} pic={user.pic} size={88}/>
-              }
-              <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",opacity:0,transition:"opacity 0.2s"}}
-                onMouseEnter={e=>{e.currentTarget.style.opacity=1;}} onMouseLeave={e=>{e.currentTarget.style.opacity=0;}}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><polyline points="17,8 12,3 7,8" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><line x1="12" y1="3" x2="12" y2="15" stroke="#fff" strokeWidth="2" strokeLinecap="round"/></svg>
-              </div>
-            </div>
-          </div>
-          <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleAvatarPick}/>
-
-          <button onClick={()=>fileRef.current.click()} style={{width:"100%",padding:"12px",marginBottom:10,borderRadius:12,background:"rgba(139,92,246,0.08)",border:"1px solid rgba(139,92,246,0.25)",color:"rgba(196,181,253,0.85)",fontFamily:MONO,fontSize:11,fontWeight:700,cursor:"pointer",letterSpacing:"0.06em",transition:"all 0.2s"}}
-            onMouseEnter={e=>{e.currentTarget.style.background="rgba(139,92,246,0.16)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(139,92,246,0.08)";}}>
-            {newPic?"CHANGE PHOTO":"CHOOSE PHOTO"}
-          </button>
-
-          <div style={{display:"flex",gap:10}}>
-            <button onClick={()=>{setShowAvatarModal(false);setNewPic(null);}} style={{flex:1,padding:"12px",borderRadius:12,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",color:"rgba(255,255,255,0.45)",fontFamily:MONO,fontSize:11,fontWeight:700,cursor:"pointer"}}>CANCEL</button>
-            <button onClick={doAvatarUpload} disabled={!newPic||uploading}
-              style={{flex:1,padding:"12px",borderRadius:12,background:newPic?"rgba(52,211,153,0.12)":"rgba(255,255,255,0.03)",border:`1px solid ${newPic?"rgba(52,211,153,0.3)":"rgba(255,255,255,0.07)"}`,color:newPic?"rgba(52,211,153,0.9)":"rgba(255,255,255,0.2)",fontFamily:MONO,fontSize:11,fontWeight:700,cursor:newPic&&!uploading?"pointer":"not-allowed",transition:"all 0.2s",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-              {uploading?<><Spin/>SAVING...</>:"SAVE"}
-            </button>
-          </div>
-        </div>
-      </div>}
     </div>
   );
 }
@@ -1237,6 +1175,10 @@ function App() {
   const [timeFilter,  setTimeFilter]  = useState("all");
   const [tableKey,    setTableKey]    = useState(1);
   const [showLoginScreen, setShowLoginScreen] = useState(false);
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [newAvatarPic,    setNewAvatarPic]    = useState(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarFileRef = useRef();
 
   const handleFilterChange = (id) => {
     setTimeFilter(id);
@@ -1412,6 +1354,20 @@ function App() {
     setToast({msg:"Avatar updated!"});
   };
 
+  const doAvatarUpload = async () => {
+    if(!newAvatarPic) return;
+    setUploadingAvatar(true);
+    try {
+      const avatarUrl = await uploadImg(newAvatarPic, `avatars/${user.id}.jpg`);
+      await SUPA.from('profiles').update({avatar_url:avatarUrl}).eq('id',user.id);
+      await SUPA.from('traders').update({avatar_url:avatarUrl}).eq('id',user.id);
+      handleAvatarChange(avatarUrl);
+      setShowAvatarModal(false);
+      setNewAvatarPic(null);
+    } catch(e){ setToast({msg:"Upload failed.",isError:true}); }
+    setUploadingAvatar(false);
+  };
+
   const handleSubmit = async (data) => {
     const uid=user.id;
     try {
@@ -1503,7 +1459,7 @@ function App() {
               <span className="hide-mobile" style={{fontSize:9,color:"rgba(52,211,153,0.45)"}}>{new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}</span>
             </div>
             {user
-              ?<NavUserMenu user={user} onLogout={handleLogout} onSubmit={()=>setShowSub(true)} onRequestDeleteAccount={()=>setConfirmDelAccount(true)} onAvatarChange={handleAvatarChange}/>
+              ?<NavUserMenu user={user} onLogout={handleLogout} onSubmit={()=>setShowSub(true)} onRequestDeleteAccount={()=>setConfirmDelAccount(true)} onRequestChangeAvatar={()=>setShowAvatarModal(true)}/>
               :<button onClick={()=>setShowLoginScreen(true)}
                 style={{display:"flex",alignItems:"center",gap:7,padding:"7px 14px",background:"linear-gradient(135deg,rgba(139,92,246,0.18),rgba(99,102,241,0.12))",border:"1px solid rgba(139,92,246,0.35)",borderRadius:99,color:"rgba(196,181,253,0.95)",fontSize:11,cursor:"pointer",fontWeight:700,letterSpacing:"0.06em",fontFamily:MONO,boxShadow:"0 0 16px rgba(139,92,246,0.15)",transition:"all 0.2s",whiteSpace:"nowrap",animation:"fadeIn 0.4s cubic-bezier(0.16,1,0.3,1)"}}
                 onMouseEnter={e=>{e.currentTarget.style.background="linear-gradient(135deg,rgba(139,92,246,0.28),rgba(99,102,241,0.2))";e.currentTarget.style.boxShadow="0 0 28px rgba(139,92,246,0.3)";}}
@@ -1585,6 +1541,35 @@ function App() {
 
       {showSub&&user&&<SubmitPanel user={user} students={students} onClose={()=>setShowSub(false)} onSubmit={handleSubmit}/>}
       {toast&&<Toast msg={toast.msg} isError={toast.isError} onDone={()=>setToast(null)}/>}
+
+      {/* ── Change Avatar Modal — rendered at root so always centered ── */}
+      <input ref={avatarFileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>setNewAvatarPic(ev.target.result);r.readAsDataURL(f);e.target.value="";}}/>
+      {showAvatarModal&&user&&<div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.82)",backdropFilter:"blur(18px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}} onClick={()=>!uploadingAvatar&&(setShowAvatarModal(false),setNewAvatarPic(null))}>
+        <div onClick={e=>e.stopPropagation()} className="modal-enter" style={{position:"relative",background:"linear-gradient(145deg,rgba(13,10,26,0.99),rgba(8,8,18,0.99))",border:"1px solid rgba(139,92,246,0.22)",borderRadius:26,padding:"36px",width:400,maxWidth:"92vw",boxShadow:"0 0 0 1px rgba(139,92,246,0.06),0 0 80px rgba(139,92,246,0.15),0 50px 100px rgba(0,0,0,0.8)",overflow:"hidden",textAlign:"center"}}>
+          <div style={{position:"absolute",top:"-50px",right:"-50px",width:"180px",height:"180px",borderRadius:"50%",background:"radial-gradient(circle,rgba(139,92,246,0.18),transparent 65%)",pointerEvents:"none"}}/>
+          <div style={{fontSize:18,fontWeight:700,fontFamily:SANS,color:"#fff",marginBottom:6,letterSpacing:"-0.02em"}}>Change Avatar</div>
+          <div style={{fontSize:12,fontFamily:MONO,color:"rgba(255,255,255,0.25)",marginBottom:24,letterSpacing:"0.06em"}}>CHOOSE A NEW PROFILE PICTURE</div>
+          <div style={{display:"flex",justifyContent:"center",marginBottom:20}}>
+            <div style={{position:"relative",width:90,height:90,borderRadius:"50%",overflow:"hidden",border:`3px solid ${newAvatarPic?"rgba(52,211,153,0.5)":"rgba(139,92,246,0.3)"}`,boxShadow:`0 0 24px ${newAvatarPic?"rgba(52,211,153,0.2)":"rgba(139,92,246,0.15)"}`,cursor:"pointer",transition:"all 0.25s"}} onClick={()=>avatarFileRef.current.click()}>
+              {newAvatarPic?<img src={newAvatarPic} style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<Avatar name={user.name} pic={user.pic} size={90}/>}
+              <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" style={{opacity:0.8}}><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><polyline points="17,8 12,3 7,8" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><line x1="12" y1="3" x2="12" y2="15" stroke="#fff" strokeWidth="2" strokeLinecap="round"/></svg>
+              </div>
+            </div>
+          </div>
+          <button onClick={()=>avatarFileRef.current.click()} style={{width:"100%",padding:"12px",marginBottom:10,borderRadius:12,background:"rgba(139,92,246,0.08)",border:"1px solid rgba(139,92,246,0.25)",color:"rgba(196,181,253,0.85)",fontFamily:MONO,fontSize:11,fontWeight:700,cursor:"pointer",letterSpacing:"0.06em",transition:"all 0.2s"}}
+            onMouseEnter={e=>{e.currentTarget.style.background="rgba(139,92,246,0.16)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(139,92,246,0.08)";}}>
+            {newAvatarPic?"CHANGE PHOTO":"CHOOSE PHOTO"}
+          </button>
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={()=>{setShowAvatarModal(false);setNewAvatarPic(null);}} style={{flex:1,padding:"12px",borderRadius:12,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",color:"rgba(255,255,255,0.45)",fontFamily:MONO,fontSize:11,fontWeight:700,cursor:"pointer"}}>CANCEL</button>
+            <button onClick={doAvatarUpload} disabled={!newAvatarPic||uploadingAvatar}
+              style={{flex:1,padding:"12px",borderRadius:12,background:newAvatarPic?"rgba(52,211,153,0.12)":"rgba(255,255,255,0.03)",border:`1px solid ${newAvatarPic?"rgba(52,211,153,0.3)":"rgba(255,255,255,0.07)"}`,color:newAvatarPic?"rgba(52,211,153,0.9)":"rgba(255,255,255,0.2)",fontFamily:MONO,fontSize:11,fontWeight:700,cursor:newAvatarPic&&!uploadingAvatar?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",gap:6,transition:"all 0.2s"}}>
+              {uploadingAvatar?<><Spin/>SAVING...</>:"SAVE"}
+            </button>
+          </div>
+        </div>
+      </div>}
 
       {/* ── Delete Account Modal — rendered at root so always centered ── */}
       {confirmDelAccount&&<div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.82)",backdropFilter:"blur(18px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}} onClick={()=>!deletingAccount&&setConfirmDelAccount(false)}>
