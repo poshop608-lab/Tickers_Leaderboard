@@ -282,7 +282,7 @@ function InputField({ label, value, onChange, placeholder, type="text", onEnter 
 }
 
 /* ── LoginScreen ─────────────────────────────────────────── */
-const LoginScreen = React.memo(function LoginScreen({ onLogin }) {
+const LoginScreen = React.memo(function LoginScreen({ onLogin, onClose }) {
   const [mode,setMode]         = useState("choose");
   const [username,setUsername] = useState("");
   const [email,setEmail]       = useState("");
@@ -390,8 +390,11 @@ const LoginScreen = React.memo(function LoginScreen({ onLogin }) {
   );
 
   const wrap = (children) => (
-    <div style={{position:"fixed",inset:0,background:"#05050f",zIndex:300,fontFamily:SANS,overflowY:"auto"}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(5,5,15,0.95)",zIndex:300,fontFamily:SANS,overflowY:"auto",backdropFilter:"blur(20px)"}}>
       {BG}
+      {onClose&&<button onClick={onClose} style={{position:"fixed",top:20,right:20,zIndex:400,width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.5)",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.2s"}}
+        onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.12)";e.currentTarget.style.color="#fff";}}
+        onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.06)";e.currentTarget.style.color="rgba(255,255,255,0.5)";}}>✕</button>}
       <div style={{minHeight:"100%",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}}>
         <div onClick={e=>e.stopPropagation()} style={{...card,flexShrink:0}}>{children}</div>
       </div>
@@ -399,7 +402,11 @@ const LoginScreen = React.memo(function LoginScreen({ onLogin }) {
   );
 
   if(mode==="choose") return (
-    <div style={{position:"fixed",inset:0,background:"#05050f",zIndex:300,fontFamily:SANS,overflowY:"auto"}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(5,5,15,0.95)",zIndex:300,fontFamily:SANS,overflowY:"auto",backdropFilter:"blur(20px)"}}>
+      {BG}
+      {onClose&&<button onClick={onClose} style={{position:"fixed",top:20,right:20,zIndex:400,width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.5)",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}
+        onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.12)";e.currentTarget.style.color="#fff";}}
+        onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.06)";e.currentTarget.style.color="rgba(255,255,255,0.5)";}}>✕</button>}
       {BG}
       <div style={{minHeight:"100%",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}}>
         <div style={{...card}}>
@@ -976,6 +983,7 @@ function App() {
   const [confirmDelAccount, setConfirmDelAccount] = useState(false);
   const [deletingAccount,   setDeletingAccount]   = useState(false);
   const [timeFilter,  setTimeFilter]  = useState("all");
+  const [showLoginScreen, setShowLoginScreen] = useState(false);
 
   useEffect(()=>{ const t=setInterval(()=>setTick(x=>x+1),1000); return()=>clearInterval(t); },[]);
   const livePulse = Math.sin(tick*0.3)*0.4+0.6;
@@ -1056,6 +1064,7 @@ function App() {
 
   const handleLogin = React.useCallback(u => {
     setUser(u); setToast({msg:`Welcome, ${u.name}!`});
+    setShowLoginScreen(false);
     fetchLeaderboard(); fetchSessions();
   }, []);
   const handleLogout = async () => { await SUPA.auth.signOut(); setUser(null); setActivePage("leaderboard"); };
@@ -1168,9 +1177,9 @@ function App() {
       {/* Noise grain overlay */}
       <div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:0,opacity:0.025,backgroundImage:"url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E')",backgroundRepeat:"repeat",backgroundSize:"256px"}}/>
 
-      {!user&&<LoginScreen onLogin={handleLogin}/>}
+      {!user&&showLoginScreen&&<LoginScreen onLogin={handleLogin} onClose={()=>setShowLoginScreen(false)}/>}
 
-      <div style={{position:"relative",zIndex:1,visibility:user?"visible":"hidden",pointerEvents:user?"auto":"none"}}>
+      <div style={{position:"relative",zIndex:1}}>
         {/* NAV */}
         <div className="nav-bar" style={{borderBottom:"1px solid rgba(255,255,255,0.05)",padding:"0 24px",display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(5,5,15,0.9)",backdropFilter:"blur(30px)",WebkitBackdropFilter:"blur(30px)",position:"sticky",top:0,zIndex:10,height:60,boxShadow:"0 1px 0 rgba(139,92,246,0.1),0 4px 30px rgba(0,0,0,0.3)"}}>
           <div style={{display:"flex",alignItems:"center",gap:0,minWidth:0}}>
@@ -1182,8 +1191,8 @@ function App() {
             </div>
             {[
               {id:"leaderboard",label:"Leaderboard",icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="12" width="4" height="10" rx="1" stroke="currentColor" strokeWidth="1.8"/><rect x="9" y="7" width="4" height="15" rx="1" stroke="currentColor" strokeWidth="1.8"/><rect x="16" y="2" width="4" height="20" rx="1" stroke="currentColor" strokeWidth="1.8"/></svg>},
-              {id:"pnllogs",label:"PnL Logs",icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><line x1="9" y1="13" x2="15" y2="13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><line x1="9" y1="17" x2="13" y2="17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>,badge:myCount},
-              ...(user?.role==="admin"?[{id:"admin",label:"Admin",icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="rgba(139,92,246,0.9)" strokeWidth="1.8" strokeLinejoin="round"/></svg>,isAdmin:true}]:[]),
+              ...(user?[{id:"pnllogs",label:"PnL Logs",icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><line x1="9" y1="13" x2="15" y2="13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><line x1="9" y1="17" x2="13" y2="17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>,badge:myCount}]:[]),
+              ...(user?.role==="admin"?[{id:"admin",label:"Admin",icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="rgba(139,92,246,0.9)" strokeWidth="1.8" strokeLinejoin="round"/></svg>}]:[]),
             ].map(tab=>{
               const active=activePage===tab.id;
               return <button key={tab.id} onClick={()=>setActivePage(tab.id)} style={{display:"flex",alignItems:"center",gap:6,padding:"0 12px",height:60,background:"none",border:"none",cursor:"pointer",position:"relative",color:active?"rgba(196,181,253,0.95)":"rgba(255,255,255,0.3)",fontFamily:MONO,fontSize:12,fontWeight:600,letterSpacing:"0.05em",transition:"color 0.2s",flexShrink:0,minWidth:44}}
@@ -1200,7 +1209,16 @@ function App() {
               <span className="hide-mobile">LIVE</span>
               <span className="hide-mobile" style={{fontSize:9,color:"rgba(52,211,153,0.45)"}}>{new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}</span>
             </div>
-            {user&&<NavUserMenu user={user} onLogout={handleLogout} onSubmit={()=>setShowSub(true)} onRequestDeleteAccount={()=>setConfirmDelAccount(true)}/>}
+            {user
+              ?<NavUserMenu user={user} onLogout={handleLogout} onSubmit={()=>setShowSub(true)} onRequestDeleteAccount={()=>setConfirmDelAccount(true)}/>
+              :<button onClick={()=>setShowLoginScreen(true)}
+                style={{display:"flex",alignItems:"center",gap:7,padding:"7px 14px",background:"linear-gradient(135deg,rgba(139,92,246,0.18),rgba(99,102,241,0.12))",border:"1px solid rgba(139,92,246,0.35)",borderRadius:99,color:"rgba(196,181,253,0.95)",fontSize:11,cursor:"pointer",fontWeight:700,letterSpacing:"0.06em",fontFamily:MONO,boxShadow:"0 0 16px rgba(139,92,246,0.15)",transition:"all 0.2s",whiteSpace:"nowrap"}}
+                onMouseEnter={e=>{e.currentTarget.style.background="linear-gradient(135deg,rgba(139,92,246,0.28),rgba(99,102,241,0.2))";e.currentTarget.style.boxShadow="0 0 28px rgba(139,92,246,0.3)";}}
+                onMouseLeave={e=>{e.currentTarget.style.background="linear-gradient(135deg,rgba(139,92,246,0.18),rgba(99,102,241,0.12))";e.currentTarget.style.boxShadow="0 0 16px rgba(139,92,246,0.15)";}}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><polyline points="10,17 15,12 10,7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><line x1="15" y1="12" x2="3" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                SIGN IN
+              </button>
+            }
           </div>
         </div>
 
