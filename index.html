@@ -28,7 +28,7 @@
   @keyframes tableFlash{0%{opacity:0;transform:translateY(8px)}60%{opacity:1;transform:translateY(-2px)}100%{opacity:1;transform:translateY(0)}}
   @keyframes loginSlideUp{from{opacity:0;transform:translateY(40px) scale(0.97)}to{opacity:1;transform:translateY(0) scale(1)}}
   @keyframes loginSlideDown{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(-30px) scale(0.97)}}
-  @keyframes rowStagger{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:translateX(0)}}
+  @keyframes rowStagger{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:translateY(0)}}
 
   input[type=number]{-moz-appearance:textfield;}
   input[type=number]::-webkit-outer-spin-button,
@@ -112,11 +112,12 @@ const uploadImg = async (dataUrl, path) => {
 
 /* ── Avatar ─────────────────────────────────────────────── */
 const Avatar = ({ name, pic, size=36 }) => {
+  const [imgErr,setImgErr]=useState(false);
   const hues=[258,280,240,310,265,250,295];
   const h=hues[name.charCodeAt(0)%hues.length];
-  return pic
-    ? <img src={pic} style={{width:size,height:size,borderRadius:"50%",objectFit:"cover",flexShrink:0,boxShadow:`0 0 14px hsla(${h},80%,65%,0.45)`}}/>
-    : <div style={{width:size,height:size,borderRadius:"50%",flexShrink:0,background:`linear-gradient(135deg,hsl(${h},70%,72%),hsl(${h+30},80%,50%))`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*0.4,fontWeight:700,color:"#fff",fontFamily:SANS,boxShadow:`0 0 14px hsla(${h},80%,65%,0.5)`}}>{name[0].toUpperCase()}</div>;
+  const fallback=<div style={{width:size,height:size,borderRadius:"50%",flexShrink:0,background:`linear-gradient(135deg,hsl(${h},70%,72%),hsl(${h+30},80%,50%))`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*0.4,fontWeight:700,color:"#fff",fontFamily:SANS,boxShadow:`0 0 14px hsla(${h},80%,65%,0.5)`}}>{name[0].toUpperCase()}</div>;
+  if(!pic||imgErr) return fallback;
+  return <img src={pic} onError={()=>setImgErr(true)} style={{width:size,height:size,borderRadius:"50%",objectFit:"cover",flexShrink:0,boxShadow:`0 0 14px hsla(${h},80%,65%,0.45)`}}/>;
 };
 
 /* ── Spinner ─────────────────────────────────────────────── */
@@ -932,21 +933,20 @@ function AdminPanel({ students, sessions, onDeleteSession, onDeleteTrader }) {
   const approveUser = async (profile) => {
     setApprovingId(profile.id);
     try {
-      // Update profile status to approved
       await SUPA.from('profiles').update({status:'approved'}).eq('id',profile.id);
-      // Create trader row — check if exists first
       const {data:existing} = await SUPA.from('traders').select('id').eq('id',profile.id).maybeSingle();
       if(!existing) {
-        await SUPA.from('traders').insert({
-          id:profile.id,
-          username:profile.username,
+        const {error} = await SUPA.from('traders').insert({
+          id:          profile.id,
+          username:    profile.username,
           display_name:profile.display_name,
-          avatar_url:profile.avatar_url,
+          avatar_url:  profile.avatar_url,
           pnl:0, trades:0, wins:0,
           hide_pnl:false,
           role:'member',
           rr_made:0
         });
+        if(error) { console.error('Trader insert error:',error); }
       }
       setPending(p=>p.filter(x=>x.id!==profile.id));
     } catch(e) { console.error('Approve error:',e); }
@@ -1138,7 +1138,7 @@ function App() {
   const [confirmDelAccount, setConfirmDelAccount] = useState(false);
   const [deletingAccount,   setDeletingAccount]   = useState(false);
   const [timeFilter,  setTimeFilter]  = useState("all");
-  const [tableKey,    setTableKey]    = useState(0);
+  const [tableKey,    setTableKey]    = useState(1);
   const [showLoginScreen, setShowLoginScreen] = useState(false);
 
   const handleFilterChange = (id) => {
@@ -1151,13 +1151,17 @@ function App() {
 
   /* restore session on page load — don't block rendering */
   useEffect(()=>{
-    // Show app immediately, resolve auth in background
-    const timeout = setTimeout(()=>setAppLoading(false), 1500); // fallback
+    const timeout = setTimeout(()=>setAppLoading(false), 1500);
     SUPA.auth.getSession().then(async({data:{session}})=>{
       if(session){
         try {
           const {data:p}=await SUPA.from('profiles').select('*').eq('id',session.user.id).single();
-          if(p) setUser({name:p.display_name,pic:p.avatar_url,id:session.user.id,email:session.user.email,role:p.role||'member'});
+          if(p && p.status!=='pending') {
+            setUser({name:p.display_name,pic:p.avatar_url,id:session.user.id,email:session.user.email,role:p.role||'member'});
+          } else if(p && p.status==='pending') {
+            // Sign them out — they need approval first
+            await SUPA.auth.signOut();
+          }
         } catch(e) { console.log('Profile fetch error:', e); }
       }
       clearTimeout(timeout);
@@ -1172,6 +1176,7 @@ function App() {
       if(data){
         const mapped = data.filter(t=>t&&t.id&&t.display_name).map(t=>computeStats({id:t.id,name:t.display_name,pic:t.avatar_url,pnl:t.pnl||0,trades:t.trades||0,wins:t.wins||0,hidePnl:t.hide_pnl,role:t.role||'member',rrMade:t.rr_made||0}));
         setStudents(prev=>{ setPrevStudents(prev); return mapped; });
+        setTableKey(k=>k+1);
         setLastSync(new Date());
       }
     } catch(e) { console.log('Leaderboard fetch error:', e); }
@@ -1446,7 +1451,7 @@ function App() {
               {ranked.map((t,i)=>{
                 const prev=prevRanked.find(p=>p.id===t.id);
                 return (
-                  <div key={t.id} style={{animation:`rowStagger 0.35s cubic-bezier(0.16,1,0.3,1) ${i*45}ms both`}}>
+                  <div key={t.id} style={{animation:`rowStagger 0.45s cubic-bezier(0.16,1,0.3,1) ${i*80}ms both`}}>
                     <TraderRow t={t} prev={prev} isNew={newIds.has(t.id)} isSelected={selected?.id===t.id} onClick={()=>setSelected(selected?.id===t.id?null:t)} isLast={i===ranked.length-1}/>
                   </div>
                 );
