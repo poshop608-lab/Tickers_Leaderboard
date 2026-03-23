@@ -1285,7 +1285,7 @@ function App() {
     wr:filteredStudents.length?filteredStudents.reduce((a,x)=>a+x.winRate,0)/filteredStudents.length:0,
     trades:filteredStudents.reduce((a,x)=>a+x.trades,0),
     active:filteredStudents.length,
-    rr:filteredStudents.filter(x=>x.rrMade>0).length?filteredStudents.filter(x=>x.rrMade>0).reduce((a,x)=>a+x.rrMade,0)/filteredStudents.filter(x=>x.rrMade>0).length:0
+   rr:filteredStudents.reduce((a,x)=>a+x.rrMade,0)
   }),[filteredStudents]);
   const myCount    = user?sessions.filter(s=>s.user_id===user.id).length:0;
 
