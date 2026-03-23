@@ -117,11 +117,11 @@ const G = "#34d399", R = "#fb7185", P = "#a78bfa";
 const fmt    = v => { const a=Math.abs(v),s=v>=0?"+":"-"; return a>=1000?`${s}$${(a/1e3).toFixed(1)}k`:`${s}$${a.toFixed(0)}`; };
 const fmtAvg = v => { const a=Math.abs(v),s=v>=0?"+":"-"; return a>=1000?`${s}$${(a/1e3).toFixed(1)}k`:`${s}$${a.toFixed(0)}`; };
 const pct    = v => `${v.toFixed(1)}%`;
-const computeStats = s => ({ 
-  ...s, 
-  winRate: s.trades > 0 ? (s.wins / s.trades) * 100 : 0, 
-  avgReturn: s.trades > 0 ? s.pnl / s.trades : 0, 
-  rrMade: Number(s.rrMade || 0) 
+const computeStats = s => ({
+  ...s,
+  winRate: s.trades > 0 ? (s.wins / s.trades) * 100 : 0,
+  avgReturn: s.trades > 0 ? s.pnl / s.trades : 0,
+  rrMade: Number(s.rrMade || 0)
 });
 /* upload a base64 dataUrl to Supabase storage, return public URL */
 const uploadImg = async (dataUrl, path) => {
@@ -212,7 +212,6 @@ function StatCard({ label, val, color, glow, spin, index=0 }) {
     }, 38);
   };
 
-  // Trigger spin whenever val changes (including first real data load)
   useEffect(()=>{
     const t = setTimeout(()=>doSpin(val), index*70+50);
     return()=>{ clearTimeout(t); if(intervalRef.current) clearInterval(intervalRef.current); };
@@ -365,7 +364,6 @@ const LoginScreen = React.memo(function LoginScreen({ onLogin, onClose }) {
   const [pendingUid,setPendingUid]   = useState(null);
   const fileRef = useRef();
 
-  // Poll every 3 seconds when on pending screen — auto-login when approved
   useEffect(()=>{
     if(mode!=="pending"||!pendingUid) return;
     const poll = setInterval(async()=>{
@@ -373,14 +371,11 @@ const LoginScreen = React.memo(function LoginScreen({ onLogin, onClose }) {
         const {data:p} = await SUPA.from('profiles').select('*').eq('id',pendingUid).single();
         if(p && p.status==='approved') {
           clearInterval(poll);
-          // Wait a moment for trader row to be created
           setTimeout(async()=>{
-            // Check trader row exists
             const {data:trader} = await SUPA.from('traders').select('*').eq('id',pendingUid).maybeSingle();
             if(trader) {
               onLogin({name:p.display_name, pic:p.avatar_url, id:p.id, email:p.email, role:p.role||'member'});
             } else {
-              // Trader row not created yet, wait another second
               setTimeout(async()=>{
                 onLogin({name:p.display_name, pic:p.avatar_url, id:p.id, email:p.email, role:p.role||'member'});
               }, 2000);
@@ -552,7 +547,6 @@ const LoginScreen = React.memo(function LoginScreen({ onLogin, onClose }) {
     <Logo/><BackBtn onClick={()=>reset("choose")}/>
     <div style={{fontSize:26,fontWeight:800,color:"#fff",marginBottom:3,letterSpacing:"-0.04em",animation:"slideUp 0.4s cubic-bezier(0.16,1,0.3,1) 0.05s both"}}>Create account</div>
     <div style={{fontSize:13,color:"rgba(255,255,255,0.28)",marginBottom:"1.5rem",lineHeight:1.5,animation:"slideUp 0.4s cubic-bezier(0.16,1,0.3,1) 0.1s both"}}>Join the leaderboard. Set up your profile below.</div>
-    {/* Profile pic */}
     <div style={{marginBottom:18}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
         <span style={{fontSize:10,fontFamily:MONO,color:"rgba(255,255,255,0.28)",letterSpacing:"0.11em"}}>PROFILE PICTURE</span>
@@ -646,7 +640,6 @@ function SubmitPanel({ user, students, onClose, onSubmit }) {
         <div style={{position:"absolute",top:"-60px",right:"-60px",width:"260px",height:"260px",borderRadius:"50%",background:"radial-gradient(circle,rgba(167,139,250,0.11),transparent 65%)",pointerEvents:"none"}}/>
         <div style={{position:"absolute",bottom:"80px",left:"-50px",width:"220px",height:"220px",borderRadius:"50%",background:"radial-gradient(circle,rgba(52,211,153,0.07),transparent 65%)",pointerEvents:"none"}}/>
 
-        {/* HEADER */}
         <div style={{padding:"26px 26px 20px",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
             <span style={{fontSize:9,fontFamily:MONO,color:"rgba(255,255,255,0.18)",letterSpacing:"0.14em"}}>PERFORMANCE / LOG</span>
@@ -666,9 +659,7 @@ function SubmitPanel({ user, students, onClose, onSubmit }) {
           </div>
         </div>
 
-        {/* BODY */}
         <div className="panel-body" style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",padding:"28px 26px 80px",overscrollBehavior:"contain"}}>
-          {/* P&L */}
           <div style={{marginBottom:22}}>
             <div style={{fontSize:10,fontFamily:MONO,letterSpacing:"0.13em",color:"rgba(255,255,255,0.25)",marginBottom:10}}>TODAY'S P&L</div>
             <div style={{position:"relative"}}>
@@ -683,7 +674,6 @@ function SubmitPanel({ user, students, onClose, onSubmit }) {
             {pnlNum!==0&&<div style={{marginTop:7,fontSize:12,fontFamily:MONO,fontWeight:600,color:pnlCol,textShadow:`0 0 12px ${pnlCol}88`,letterSpacing:"0.04em"}}>{isProfit?"▲ PROFIT DAY":"▼ LOSS DAY"} · {fmt(pnlNum)}</div>}
           </div>
 
-          {/* TRADES + WINS */}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
             {[{label:"TRADES",val:trades,set:setTrades,hint:"total",ac:"rgba(255,255,255,0.45)"},{label:"WINS",val:wins,set:setWins,hint:"winning",ac:"rgba(52,211,153,0.65)"}].map(f=>(
               <div key={f.label}>
@@ -703,7 +693,6 @@ function SubmitPanel({ user, students, onClose, onSubmit }) {
             <span style={{fontSize:16,fontFamily:MONO,fontWeight:700,color:liveWR>=60?G:liveWR>=40?"#fde68a":R,textShadow:`0 0 14px ${liveWR>=60?G:liveWR>=40?"#fde68a":R}99`}}>{pct(liveWR)}</span>
           </div>}
 
-          {/* RR MADE */}
           <div style={{marginBottom:14}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
               <span style={{fontSize:10,fontFamily:MONO,letterSpacing:"0.12em",color:"rgba(167,139,250,0.7)"}}>RR MADE</span>
@@ -730,7 +719,6 @@ function SubmitPanel({ user, students, onClose, onSubmit }) {
 
           {err&&<div style={{marginBottom:16,padding:"10px 14px",background:"rgba(251,113,133,0.07)",border:"1px solid rgba(251,113,133,0.18)",borderRadius:10,color:"rgba(251,113,133,0.9)",fontSize:12,fontFamily:MONO}}>{err}</div>}
 
-          {/* SCREENSHOTS */}
           <div style={{marginBottom:14}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
               <span style={{fontSize:10,fontFamily:MONO,letterSpacing:"0.12em",color:"rgba(255,255,255,0.3)"}}>TRADE SCREENSHOTS</span>
@@ -771,13 +759,11 @@ function SubmitPanel({ user, students, onClose, onSubmit }) {
             )}
           </div>
 
-          {/* LIGHTBOX */}
           {lightbox&&<div onClick={()=>setLightbox(null)} style={{position:"fixed",inset:0,zIndex:999,background:"rgba(0,0,0,0.88)",backdropFilter:"blur(10px)",display:"flex",alignItems:"center",justifyContent:"center"}}>
             <img src={lightbox} style={{maxWidth:"90vw",maxHeight:"90vh",borderRadius:14,boxShadow:"0 0 60px rgba(0,0,0,0.8)"}} onClick={e=>e.stopPropagation()}/>
             <button onClick={()=>setLightbox(null)} style={{position:"fixed",top:20,right:24,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:"50%",width:36,height:36,color:"#fff",fontSize:16,cursor:"pointer"}}>✕</button>
           </div>}
 
-          {/* PRIVACY */}
           <div onClick={()=>setHideP(h=>!h)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"15px 16px",marginBottom:18,borderRadius:14,cursor:"pointer",background:hideP?"rgba(167,139,250,0.08)":"rgba(255,255,255,0.02)",border:`1px solid ${hideP?"rgba(167,139,250,0.3)":"rgba(255,255,255,0.07)"}`,boxShadow:hideP?"0 0 28px rgba(167,139,250,0.12)":"none",transition:"all 0.28s cubic-bezier(0.34,1.56,0.64,1)"}}>
             <div style={{display:"flex",alignItems:"center",gap:12}}>
               <div style={{width:34,height:34,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,background:hideP?"rgba(167,139,250,0.14)":"rgba(255,255,255,0.04)",border:`1px solid ${hideP?"rgba(167,139,250,0.3)":"rgba(255,255,255,0.07)"}`,boxShadow:hideP?"0 0 16px rgba(167,139,250,0.28)":"none",transition:"all 0.28s"}}>
@@ -884,7 +870,6 @@ function PnlLogs({ user, sessions, onDeleteSession }) {
         <button onClick={()=>setLb(null)} style={{position:"fixed",top:20,right:24,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:"50%",width:36,height:36,color:"#fff",fontSize:16,cursor:"pointer"}}>✕</button>
       </div>}
 
-      {/* Delete session confirm */}
       {confirmId&&<div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.8)",backdropFilter:"blur(16px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}} onClick={()=>!deleting&&setConfirmId(null)}>
         <div onClick={e=>e.stopPropagation()} style={{position:"relative",background:"linear-gradient(135deg,rgba(14,14,28,0.98),rgba(10,10,20,0.98))",border:"1px solid rgba(255,60,60,0.2)",borderRadius:24,padding:"32px",width:380,maxWidth:"92vw",boxShadow:"0 0 60px rgba(255,60,60,0.12),0 0 120px rgba(255,60,60,0.06),0 40px 80px rgba(0,0,0,0.7)",animation:"fadeIn 0.25s ease",overflow:"hidden",textAlign:"center"}}>
           <div style={{position:"absolute",top:"-40px",right:"-40px",width:"140px",height:"140px",borderRadius:"50%",background:"radial-gradient(circle,rgba(255,60,60,0.15),transparent 65%)",pointerEvents:"none"}}/>
@@ -971,9 +956,7 @@ function AdminPanel({ students, sessions, onDeleteSession, onDeleteTrader }) {
   const [pending, setPending] = useState([]);
   const [approvingId, setApprovingId] = useState(null);
 
-  useEffect(()=>{
-    fetchPending();
-  },[]);
+  useEffect(()=>{ fetchPending(); },[]);
 
   const fetchPending = async () => {
     const {data} = await SUPA.from('profiles').select('*').eq('status','pending');
@@ -983,7 +966,6 @@ function AdminPanel({ students, sessions, onDeleteSession, onDeleteTrader }) {
   const approveUser = async (profile) => {
     setApprovingId(profile.id);
     try {
-      // Create trader row FIRST so it exists when user polls for approval
       const {data:existing} = await SUPA.from('traders').select('id').eq('id',profile.id).maybeSingle();
       if(!existing) {
         const {error} = await SUPA.from('traders').insert({
@@ -998,7 +980,6 @@ function AdminPanel({ students, sessions, onDeleteSession, onDeleteTrader }) {
         });
         if(error) console.error('Trader insert error:',error);
       }
-      // THEN update status — this is what the poll detects
       await SUPA.from('profiles').update({status:'approved'}).eq('id',profile.id);
       setPending(p=>p.filter(x=>x.id!==profile.id));
     } catch(e) { console.error('Approve error:',e); }
@@ -1016,7 +997,6 @@ function AdminPanel({ students, sessions, onDeleteSession, onDeleteTrader }) {
 
   return (
     <div style={{padding:"24px 32px 40px",maxWidth:1200,margin:"0 auto",animation:"fadeIn 0.4s ease"}}>
-      {/* Header */}
       <div style={{marginBottom:"1.5rem",display:"flex",alignItems:"center",gap:14}}>
         <div style={{width:44,height:44,borderRadius:13,background:"linear-gradient(135deg,rgba(139,92,246,0.2),rgba(99,102,241,0.12))",border:"1px solid rgba(139,92,246,0.35)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 0 24px rgba(139,92,246,0.25)"}}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinejoin="round"/></svg>
@@ -1027,7 +1007,6 @@ function AdminPanel({ students, sessions, onDeleteSession, onDeleteTrader }) {
         </div>
       </div>
 
-      {/* Pending Approvals */}
       {pending.length>0&&<div style={{marginBottom:20,border:"1px solid rgba(253,230,138,0.2)",borderRadius:16,overflow:"hidden",background:"rgba(253,230,138,0.02)"}}>
         <div style={{padding:"13px 20px",borderBottom:"1px solid rgba(253,230,138,0.1)",display:"flex",alignItems:"center",gap:8}}>
           <span style={{width:7,height:7,borderRadius:"50%",background:"rgba(253,230,138,0.9)",boxShadow:"0 0 8px rgba(253,230,138,0.6)",display:"inline-block",animation:"pulseGlow 1.5s ease-in-out infinite"}}/>
@@ -1058,13 +1037,11 @@ function AdminPanel({ students, sessions, onDeleteSession, onDeleteTrader }) {
         ))}
       </div>}
 
-      {/* Traders list */}
       {students.map(trader=>{
         const traderSessions = sessions.filter(s=>s.user_id===trader.id);
         const isExpanded = expandedUser===trader.id;
         return (
           <div key={trader.id} style={{marginBottom:12,border:`1px solid ${isExpanded?"rgba(139,92,246,0.25)":"rgba(255,255,255,0.06)"}`,borderRadius:16,overflow:"hidden",background:"rgba(10,8,22,0.9)",transition:"border-color 0.2s"}}>
-            {/* Trader header row */}
             <div onClick={()=>setExpandedUser(isExpanded?null:trader.id)}
               style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 20px",cursor:"pointer",background:isExpanded?"rgba(139,92,246,0.06)":"transparent",transition:"background 0.2s"}}>
               <div style={{display:"flex",alignItems:"center",gap:12}}>
@@ -1088,7 +1065,6 @@ function AdminPanel({ students, sessions, onDeleteSession, onDeleteTrader }) {
               </div>
             </div>
 
-            {/* Sessions */}
             {isExpanded&&<div style={{borderTop:"1px solid rgba(255,255,255,0.05)",padding:"12px 20px",display:"flex",flexDirection:"column",gap:10}}>
               {traderSessions.length===0
                 ?<div style={{textAlign:"center",padding:"24px",fontFamily:MONO,fontSize:11,color:"rgba(255,255,255,0.15)"}}>NO SESSIONS YET</div>
@@ -1111,7 +1087,6 @@ function AdminPanel({ students, sessions, onDeleteSession, onDeleteTrader }) {
                           DELETE
                         </button>
                       </div>
-                      {/* Proof screenshots */}
                       {s.proof_urls?.length>0&&<div style={{padding:"0 16px 12px",display:"flex",gap:8,flexWrap:"wrap"}}>
                         {s.proof_urls.map((src,j)=>(
                           <img key={j} src={src} onClick={()=>setLightbox(src)}
@@ -1128,13 +1103,11 @@ function AdminPanel({ students, sessions, onDeleteSession, onDeleteTrader }) {
         );
       })}
 
-      {/* Lightbox */}
       {lightbox&&<div onClick={()=>setLightbox(null)} style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.92)",backdropFilter:"blur(12px)",display:"flex",alignItems:"center",justifyContent:"center"}}>
         <img src={lightbox} style={{maxWidth:"92vw",maxHeight:"90vh",borderRadius:12,boxShadow:"0 0 80px rgba(0,0,0,0.8)"}} onClick={e=>e.stopPropagation()}/>
         <button onClick={()=>setLightbox(null)} style={{position:"fixed",top:20,right:24,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:"50%",width:38,height:38,color:"#fff",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
       </div>}
 
-      {/* Delete session confirm */}
       {confirmDel&&<div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.8)",backdropFilter:"blur(16px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}} onClick={()=>!busy&&setConfirmDel(null)}>
         <div onClick={e=>e.stopPropagation()} className="modal-enter" style={{position:"relative",background:"linear-gradient(145deg,rgba(13,10,26,0.99),rgba(8,8,18,0.99))",border:"1px solid rgba(255,60,60,0.2)",borderRadius:24,padding:"32px",width:380,maxWidth:"92vw",textAlign:"center",overflow:"hidden",boxShadow:"0 0 60px rgba(255,60,60,0.12),0 40px 80px rgba(0,0,0,0.7)"}}>
           <div style={{position:"absolute",top:"-40px",right:"-40px",width:"140px",height:"140px",borderRadius:"50%",background:"radial-gradient(circle,rgba(255,60,60,0.15),transparent 65%)",pointerEvents:"none"}}/>
@@ -1150,7 +1123,6 @@ function AdminPanel({ students, sessions, onDeleteSession, onDeleteTrader }) {
         </div>
       </div>}
 
-      {/* Delete trader confirm */}
       {confirmDelTrader&&<div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.8)",backdropFilter:"blur(16px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}} onClick={()=>!busy&&setConfirmDelTrader(null)}>
         <div onClick={e=>e.stopPropagation()} className="modal-enter" style={{position:"relative",background:"linear-gradient(145deg,rgba(13,10,26,0.99),rgba(8,8,18,0.99))",border:"1px solid rgba(255,60,60,0.2)",borderRadius:24,padding:"32px",width:400,maxWidth:"92vw",textAlign:"center",overflow:"hidden",boxShadow:"0 0 60px rgba(255,60,60,0.12),0 40px 80px rgba(0,0,0,0.7)"}}>
           <div style={{position:"absolute",top:"-40px",right:"-40px",width:"160px",height:"160px",borderRadius:"50%",background:"radial-gradient(circle,rgba(255,60,60,0.18),transparent 65%)",pointerEvents:"none"}}/>
@@ -1205,7 +1177,6 @@ function App() {
   useEffect(()=>{ const t=setInterval(()=>setTick(x=>x+1),1000); return()=>clearInterval(t); },[]);
   const livePulse = Math.sin(tick*0.3)*0.4+0.6;
 
-  /* restore session on page load — don't block rendering */
   useEffect(()=>{
     const timeout = setTimeout(()=>setAppLoading(false), 1500);
     SUPA.auth.getSession().then(async({data:{session}})=>{
@@ -1215,7 +1186,6 @@ function App() {
           if(p && p.status!=='pending') {
             setUser({name:p.display_name,pic:p.avatar_url,id:session.user.id,email:session.user.email,role:p.role||'member'});
           } else if(p && p.status==='pending') {
-            // Sign them out — they need approval first
             await SUPA.auth.signOut();
           }
         } catch(e) { console.log('Profile fetch error:', e); }
@@ -1249,7 +1219,6 @@ function App() {
     fetchLeaderboard();
     fetchSessions();
 
-    /* ── Supabase Realtime — instant updates, no polling needed ── */
     const ch = SUPA.channel('traders-realtime')
       .on('postgres_changes', { event:'*', schema:'public', table:'traders' }, () => {
         fetchLeaderboard();
@@ -1270,14 +1239,13 @@ function App() {
     else if(timeFilter==="week") cutoff.setDate(now.getDate()-7);
     else if(timeFilter==="month") cutoff.setDate(now.getDate()-30);
     const filtered = sessions.filter(s=>new Date(s.submitted_at)>=cutoff);
-    // Always show all traders — just show their period stats (0 if no activity)
     return students.map(trader=>{
       const ts = filtered.filter(s=>s.user_id===trader.id);
       const pnl   = ts.reduce((a,s)=>a+(s.pnl||0),0);
       const trades= ts.reduce((a,s)=>a+(s.trades||0),0);
       const wins  = ts.reduce((a,s)=>a+(s.wins||0),0);
-      const rrSessions = ts.filter(s=>s.rr>0);
-      const rrMade = rrSessions.reduce((a,s)=>a+(s.rr||0),0);
+      // ── FIX: RR is summed, not averaged ──
+      const rrMade = ts.reduce((a,s)=>a+(s.rr||0),0);
       return computeStats({...trader, pnl, trades, wins, rrMade});
     });
   },[students,sessions,timeFilter]);
@@ -1286,12 +1254,12 @@ function App() {
   const prevRanked = useMemo(()=>[...prevStudents].sort((a,b)=>b.pnl-a.pnl).map((s,i)=>({...s,rank:i+1})),[prevStudents]);
   const totals = useMemo(()=>({
     pnl:filteredStudents.reduce((a,x)=>a+x.pnl,0),
-   wr:filteredStudents.filter(x=>x.trades>0).length?filteredStudents.filter(x=>x.trades>0).reduce((a,x)=>a+x.winRate,0)/filteredStudents.filter(x=>x.trades>0).length:0,
+    wr:filteredStudents.filter(x=>x.trades>0).length?filteredStudents.filter(x=>x.trades>0).reduce((a,x)=>a+x.winRate,0)/filteredStudents.filter(x=>x.trades>0).length:0,
     trades:filteredStudents.reduce((a,x)=>a+x.trades,0),
     active:filteredStudents.length,
-   rr:filteredStudents.reduce((a,x)=>a+x.rrMade,0)
+    rr:filteredStudents.reduce((a,x)=>a+x.rrMade,0)
   }),[filteredStudents]);
-  const myCount    = user?sessions.filter(s=>s.user_id===user.id).length:0;
+  const myCount = user?sessions.filter(s=>s.user_id===user.id).length:0;
 
   const handleLogin = React.useCallback(u => {
     setUser(u); setToast({msg:`Welcome, ${u.name}!`});
@@ -1303,15 +1271,10 @@ function App() {
   const handleDeleteAccount = async () => {
     try {
       const uid = user.id;
-      // Delete all sessions
       await SUPA.from('sessions').delete().eq('user_id', uid);
-      // Delete trader row
       await SUPA.from('traders').delete().eq('id', uid);
-      // Delete profile
       await SUPA.from('profiles').delete().eq('id', uid);
-      // Delete auth user via secure server-side function
       await SUPA.rpc('delete_own_account');
-      // Sign out
       await SUPA.auth.signOut();
       setUser(null);
       setStudents(prev => prev.filter(s => s.id !== uid));
@@ -1323,34 +1286,29 @@ function App() {
   const handleDeleteSession = async (sessionId, targetUserId) => {
     const uid = targetUserId || user.id;
     try {
-      // 1. Instantly remove session from local state
       const updatedSessions = sessions.filter(s => s.id !== sessionId);
       setSessions(updatedSessions);
 
-      // 2. Instantly recalculate trader stats from remaining local sessions
       const rem = updatedSessions.filter(s => s.user_id === uid);
       const pnl    = rem.reduce((a,s)=>a+(s.pnl||0),0);
       const trades = rem.reduce((a,s)=>a+(s.trades||0),0);
       const wins   = rem.reduce((a,s)=>a+(s.wins||0),0);
-      const rrSessions = rem.filter(s=>s.rr>0);
-      const rr_made = rrSessions.length>0 ? rrSessions.reduce((a,s)=>a+(s.rr||0),0)/rrSessions.length : 0;
+      // ── FIX: RR is summed, not averaged ──
+      const rr_made = rem.reduce((a,s)=>a+(s.rr||0),0);
       const hide_pnl = rem.length===0 ? false : rem.some(s=>s.hide_pnl);
 
-      // 3. Instantly update leaderboard UI — no waiting
       setStudents(prev => prev.map(t => t.id===uid
         ? computeStats({...t, pnl, trades, wins, rrMade:rr_made, hidePnl:hide_pnl})
         : t
       ));
 
-      // 4. Sync to DB in background
       const {error} = await SUPA.from('sessions').delete().eq('id', sessionId);
       if(error) throw error;
       await SUPA.from('traders').update({pnl,trades,wins,rr_made,hide_pnl}).eq('id',uid);
       setToast({msg:"Session deleted."});
-    } catch(e) { 
-      // Revert on error
+    } catch(e) {
       fetchLeaderboard(); fetchSessions();
-      setToast({msg:e.message||"Delete failed.",isError:true}); 
+      setToast({msg:e.message||"Delete failed.",isError:true});
     }
   };
 
@@ -1365,40 +1323,21 @@ function App() {
     } catch(e) { setToast({msg:e.message||"Delete failed.",isError:true}); }
   };
 
-  const handleAvatarChange = (newUrl) => {
-    setUser(u=>({...u,pic:newUrl}));
-    fetchLeaderboard();
-    setToast({msg:"Avatar updated!"});
-  };
-
   const doAvatarUpload = async () => {
     if(!newAvatarPic) return;
     setUploadingAvatar(true);
     try {
-      // Convert base64 to blob
       const res = await fetch(newAvatarPic);
       const blob = await res.blob();
       const path = `avatars/${user.id}.jpg`;
-      
-      // Upload to storage
       const { error: uploadErr } = await SUPA.storage
         .from('Tickers-Proofs')
         .upload(path, blob, { contentType: 'image/jpeg', upsert: true });
-      
       if(uploadErr) throw new Error('Upload failed: ' + uploadErr.message);
-      
-      // Get public URL
-      const { data: urlData } = SUPA.storage
-        .from('Tickers-Proofs')
-        .getPublicUrl(path);
-      
-      const avatarUrl = urlData.publicUrl + '?t=' + Date.now(); // cache bust
-      
-      // Update DB
+      const { data: urlData } = SUPA.storage.from('Tickers-Proofs').getPublicUrl(path);
+      const avatarUrl = urlData.publicUrl + '?t=' + Date.now();
       await SUPA.from('profiles').update({ avatar_url: avatarUrl }).eq('id', user.id);
       await SUPA.from('traders').update({ avatar_url: avatarUrl }).eq('id', user.id);
-      
-      // Update local state
       setUser(u=>({...u, pic: avatarUrl}));
       fetchLeaderboard();
       setShowAvatarModal(false);
@@ -1406,7 +1345,7 @@ function App() {
       setToast({msg:"Avatar updated! ✓"});
     } catch(e) {
       console.error('Avatar upload error:', e);
-      setToast({msg: e.message || "Upload failed. Check storage permissions.", isError:true});
+      setToast({msg: e.message || "Upload failed.", isError:true});
     }
     setUploadingAvatar(false);
   };
@@ -1414,7 +1353,6 @@ function App() {
   const handleSubmit = async (data) => {
     const uid=user.id;
     try {
-      /* upload screenshots to Supabase Storage */
       const proofUrls = await Promise.all(
         data.proofs.map(async (p,i) => {
           const ext = p.file.type.includes('png') ? 'png' : 'jpg';
@@ -1422,18 +1360,20 @@ function App() {
           return await uploadImg(p.preview, path);
         })
       );
-      /* get current trader totals */
       const {data:cur}=await SUPA.from('traders').select('*').eq('id',uid).single();
-      /* update leaderboard row */
+
+      // ── FIX: RR is a running sum — just add new RR to existing total ──
+      const new_rr_made = (cur.rr_made||0) + (data.rr||0);
+
       await SUPA.from('traders').update({
         pnl:     cur.pnl    + data.pnl,
         trades:  cur.trades + data.trades,
         wins:    cur.wins   + data.wins,
         hide_pnl: data.hidePnl,
-        rr_made: data.rr > 0 ? ((cur.rr_made||0) * cur.trades + data.rr * data.trades) / (cur.trades + data.trades) : (cur.rr_made||0),
+        rr_made: new_rr_made,
         updated_at: new Date().toISOString()
       }).eq('id',uid);
-      /* log session */
+
       await SUPA.from('sessions').insert({
         user_id:    uid,
         pnl:        data.pnl,
@@ -1461,12 +1401,10 @@ function App() {
 
   return (
     <div style={{background:"#05050f",color:"#fff",fontFamily:SANS,position:"relative",overflow:"hidden"}}>
-      {/* Background orbs */}
       <div style={{position:"fixed",top:"-20%",left:"-15%",width:"60vw",height:"60vw",borderRadius:"50%",pointerEvents:"none",zIndex:0,background:"radial-gradient(circle,rgba(139,92,246,0.14),transparent 60%)",animation:"orbFloat 8s ease-in-out infinite"}}/>
       <div style={{position:"fixed",top:"10%",right:"-18%",width:"50vw",height:"50vw",borderRadius:"50%",pointerEvents:"none",zIndex:0,background:"radial-gradient(circle,rgba(99,102,241,0.09),transparent 60%)",animation:"orbFloat 11s ease-in-out infinite reverse"}}/>
       <div style={{position:"fixed",bottom:"-15%",left:"15%",width:"55vw",height:"55vw",borderRadius:"50%",pointerEvents:"none",zIndex:0,background:"radial-gradient(circle,rgba(139,92,246,0.08),transparent 60%)",animation:"orbFloat 14s ease-in-out infinite"}}/>
       <div style={{position:"fixed",bottom:"5%",right:"5%",width:"30vw",height:"30vw",borderRadius:"50%",pointerEvents:"none",zIndex:0,background:"radial-gradient(circle,rgba(52,211,153,0.06),transparent 60%)",animation:"orbFloat 9s ease-in-out infinite reverse"}}/>
-      {/* Noise grain overlay */}
       <div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:0,opacity:0.025,backgroundImage:"url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E')",backgroundRepeat:"repeat",backgroundSize:"256px"}}/>
 
       {!user&&showLoginScreen&&<LoginScreen onLogin={handleLogin} onClose={()=>setShowLoginScreen(false)}/>}
@@ -1520,13 +1458,11 @@ function App() {
           :activePage==="pnllogs"&&user
           ?<PnlLogs user={user} sessions={sessions} onDeleteSession={handleDeleteSession}/>
           :<div className="page-wrap" style={{padding:"24px 32px 40px",maxWidth:1200,margin:"0 auto",width:"100%"}}>
-            {/* Header row */}
             <div className="header-row" style={{marginBottom:"1.25rem",animation:"fadeIn 0.5s ease",display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
               <div>
                 <h1 style={{margin:0,fontSize:"clamp(28px,4vw,48px)",fontWeight:800,fontFamily:SANS,letterSpacing:"-0.04em",lineHeight:1,color:"rgba(255,255,255,0.95)"}}>Leaderboard</h1>
                 <p style={{margin:"5px 0 0",fontSize:10,fontFamily:MONO,color:"rgba(255,255,255,0.18)",letterSpacing:"0.12em"}}>TOP DAY TRADERS · RANKED BY P&L · REAL-TIME</p>
               </div>
-              {/* Time filter */}
               <div className="filter-bar" style={{display:"flex",gap:4,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:14,padding:4}}>
                 {[{id:"today",label:"Today"},{id:"week",label:"Week"},{id:"month",label:"Month"},{id:"all",label:"All Time"}].map(f=>{
                   const active=timeFilter===f.id;
@@ -1548,7 +1484,6 @@ function App() {
                 })}
               </div>
             </div>
-            {/* Stat cards */}
             <div className="stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:12,marginBottom:"1.25rem"}}>
               {[
                 {label:"ACTIVE TRADERS", val:String(totals.active),                                          spin:false},
@@ -1560,7 +1495,6 @@ function App() {
                 <StatCard key={c.label} {...c} index={i}/>
               ))}
             </div>
-            {/* Table */}
             <div key={tableKey} style={{border:"1px solid rgba(255,255,255,0.07)",borderRadius:16,overflow:"hidden",background:"rgba(10,8,22,0.9)",animation:"tableFlash 0.4s cubic-bezier(0.16,1,0.3,1)"}}>
               <div className="table-header" style={{display:"grid",gridTemplateColumns:"44px 1fr 120px 95px 70px 90px 90px",padding:"11px 20px",borderBottom:"1px solid rgba(255,255,255,0.05)",fontFamily:MONO,fontSize:9,color:"rgba(255,255,255,0.18)",letterSpacing:"0.12em"}}>
                 <span>#</span><span>TRADER</span><span style={{textAlign:"right"}}>P&L</span><span className="hide-col" style={{textAlign:"right"}}>WIN %</span><span className="hide-col" style={{textAlign:"right"}}>TRADES</span><span className="hide-col" style={{textAlign:"right"}}>AVG RET</span><span className="hide-col" style={{textAlign:"right",color:"rgba(167,139,250,0.5)"}}>RR MADE</span>
@@ -1585,7 +1519,7 @@ function App() {
       {showSub&&user&&<SubmitPanel user={user} students={students} onClose={()=>setShowSub(false)} onSubmit={handleSubmit}/>}
       {toast&&<Toast msg={toast.msg} isError={toast.isError} onDone={()=>setToast(null)}/>}
 
-      {/* ── Change Avatar Modal — rendered at root so always centered ── */}
+      {/* ── Change Avatar Modal ── */}
       <input ref={avatarFileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>setNewAvatarPic(ev.target.result);r.readAsDataURL(f);e.target.value="";}}/>
       {showAvatarModal&&user&&<div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.82)",backdropFilter:"blur(18px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}} onClick={()=>!uploadingAvatar&&(setShowAvatarModal(false),setNewAvatarPic(null))}>
         <div onClick={e=>e.stopPropagation()} className="modal-enter" style={{position:"relative",background:"linear-gradient(145deg,rgba(13,10,26,0.99),rgba(8,8,18,0.99))",border:"1px solid rgba(139,92,246,0.22)",borderRadius:26,padding:"36px",width:400,maxWidth:"92vw",boxShadow:"0 0 0 1px rgba(139,92,246,0.06),0 0 80px rgba(139,92,246,0.15),0 50px 100px rgba(0,0,0,0.8)",overflow:"hidden",textAlign:"center"}}>
@@ -1614,12 +1548,11 @@ function App() {
         </div>
       </div>}
 
-      {/* ── Delete Account Modal — rendered at root so always centered ── */}
+      {/* ── Delete Account Modal ── */}
       {confirmDelAccount&&<div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.82)",backdropFilter:"blur(18px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}} onClick={()=>!deletingAccount&&setConfirmDelAccount(false)}>
         <div onClick={e=>e.stopPropagation()} className="modal-enter" style={{position:"relative",background:"linear-gradient(145deg,rgba(13,10,26,0.99),rgba(8,8,18,0.99))",border:"1px solid rgba(255,60,60,0.22)",borderRadius:26,padding:"38px",width:420,maxWidth:"92vw",boxShadow:"0 0 0 1px rgba(255,60,60,0.06),0 0 80px rgba(255,60,60,0.18),0 0 160px rgba(255,60,60,0.08),0 50px 100px rgba(0,0,0,0.8)",overflow:"hidden",textAlign:"center"}}>
           <div style={{position:"absolute",top:"-50px",right:"-50px",width:"200px",height:"200px",borderRadius:"50%",background:"radial-gradient(circle,rgba(255,60,60,0.2),transparent 65%)",pointerEvents:"none"}}/>
           <div style={{position:"absolute",bottom:"-40px",left:"-40px",width:"160px",height:"160px",borderRadius:"50%",background:"radial-gradient(circle,rgba(255,60,60,0.1),transparent 65%)",pointerEvents:"none"}}/>
-          <div style={{position:"absolute",top:"50%",left:"-60px",width:"120px",height:"120px",borderRadius:"50%",background:"radial-gradient(circle,rgba(139,92,246,0.08),transparent 65%)",pointerEvents:"none"}}/>
           <div style={{width:60,height:60,borderRadius:18,background:"rgba(255,60,60,0.1)",border:"1px solid rgba(255,60,60,0.28)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 22px",boxShadow:"0 0 30px rgba(255,60,60,0.25),inset 0 1px 0 rgba(255,255,255,0.05)"}}>
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><polyline points="3,6 5,6 21,6" stroke="rgba(255,110,110,0.95)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="rgba(255,110,110,0.95)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M10 11v6M14 11v6" stroke="rgba(255,110,110,0.95)" strokeWidth="2" strokeLinecap="round"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" stroke="rgba(255,110,110,0.95)" strokeWidth="2" strokeLinejoin="round"/></svg>
           </div>
@@ -1657,3 +1590,4 @@ if('serviceWorker' in navigator){
 </script>
 </body>
 </html>
+
