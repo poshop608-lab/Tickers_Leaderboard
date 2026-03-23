@@ -1282,7 +1282,7 @@ function App() {
   const prevRanked = useMemo(()=>[...prevStudents].sort((a,b)=>b.pnl-a.pnl).map((s,i)=>({...s,rank:i+1})),[prevStudents]);
   const totals = useMemo(()=>({
     pnl:filteredStudents.reduce((a,x)=>a+x.pnl,0),
-    wr:filteredStudents.length?filteredStudents.reduce((a,x)=>a+x.winRate,0)/filteredStudents.length:0,
+   wr:filteredStudents.filter(x=>x.trades>0).length?filteredStudents.filter(x=>x.trades>0).reduce((a,x)=>a+x.winRate,0)/filteredStudents.filter(x=>x.trades>0).length:0,
     trades:filteredStudents.reduce((a,x)=>a+x.trades,0),
     active:filteredStudents.length,
    rr:filteredStudents.reduce((a,x)=>a+x.rrMade,0)
