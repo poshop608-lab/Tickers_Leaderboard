@@ -117,8 +117,12 @@ const G = "#34d399", R = "#fb7185", P = "#a78bfa";
 const fmt    = v => { const a=Math.abs(v),s=v>=0?"+":"-"; return a>=1000?`${s}$${(a/1e3).toFixed(1)}k`:`${s}$${a.toFixed(0)}`; };
 const fmtAvg = v => { const a=Math.abs(v),s=v>=0?"+":"-"; return a>=1000?`${s}$${(a/1e3).toFixed(1)}k`:`${s}$${a.toFixed(0)}`; };
 const pct    = v => `${v.toFixed(1)}%`;
-const computeStats = s => ({ ...s, winRate: s.trades>0?(s.wins/s.trades)*100:0, avgReturn: s.trades>0?s.pnl/s.trades:0 });
-
+const computeStats = s => ({ 
+  ...s, 
+  winRate: s.trades > 0 ? (s.wins / s.trades) * 100 : 0, 
+  avgReturn: s.trades > 0 ? s.pnl / s.trades : 0, 
+  rrMade: Number(s.rrMade || 0) 
+});
 /* upload a base64 dataUrl to Supabase storage, return public URL */
 const uploadImg = async (dataUrl, path) => {
   const blob = await fetch(dataUrl).then(r => r.blob());
