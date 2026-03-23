@@ -1277,7 +1277,7 @@ function App() {
       const trades= ts.reduce((a,s)=>a+(s.trades||0),0);
       const wins  = ts.reduce((a,s)=>a+(s.wins||0),0);
       const rrSessions = ts.filter(s=>s.rr>0);
-      const rrMade = rrSessions.length>0 ? rrSessions.reduce((a,s)=>a+(s.rr||0),0)/rrSessions.length : 0;
+      const rrMade = rrSessions.reduce((a,s)=>a+(s.rr||0),0);
       return computeStats({...trader, pnl, trades, wins, rrMade});
     });
   },[students,sessions,timeFilter]);
