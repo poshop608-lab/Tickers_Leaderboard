@@ -42,6 +42,10 @@
   @keyframes loginSlideUp{from{opacity:0;transform:translateY(40px) scale(0.97)}to{opacity:1;transform:translateY(0) scale(1)}}
   @keyframes loginSlideDown{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(-30px) scale(0.97)}}
   @keyframes rowStagger{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes orbPulse{0%,100%{box-shadow:0 0 6px rgba(139,92,246,0.25)}50%{box-shadow:0 0 12px rgba(139,92,246,0.45)}}
+  .dl-orb{width:36px;height:36px;border-radius:50%;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.25);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;animation:orbPulse 3s ease-in-out infinite;transition:all 0.25s ease;flex-shrink:0;}
+  .dl-orb:hover{transform:scale(1.08);background:rgba(139,92,246,0.18);border-color:rgba(196,181,253,0.6);box-shadow:0 0 20px rgba(139,92,246,0.5),0 0 40px rgba(139,92,246,0.15)!important;}
+  .dl-orb:active{transform:scale(0.95);}
 
   input[type=number]{-moz-appearance:textfield;}
   input[type=number]::-webkit-outer-spin-button,
@@ -63,8 +67,9 @@
     background:linear-gradient(135deg,#c4b5fd 0%,#a78bfa 40%,#818cf8 100%);
     -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
   }
-  .stat-card{transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);}
-  .stat-card:hover{transform:translateY(-4px) scale(1.02);}
+    @keyframes cardBorderShine{0%,100%{box-shadow:0 0 0 1px rgba(139,92,246,0.15),0 0 12px rgba(139,92,246,0.08)}50%{box-shadow:0 0 0 1px rgba(167,139,250,0.4),0 0 20px rgba(139,92,246,0.18)}}
+  .stat-card{transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);animation:cardBorderShine 3s ease-in-out infinite;}
+  .stat-card:hover{transform:translateY(-4px) scale(1.02);box-shadow:0 0 0 1px rgba(196,181,253,0.55),0 0 30px rgba(139,92,246,0.3)!important;animation:none;}
 
   /* ── Mobile ── */
   @media(max-width:640px){
@@ -1228,20 +1233,9 @@ function App() {
 
   const fetchLeaderboard = async () => {
     try {
-      const [{data:traderData},{data:sessionData}] = await Promise.all([
-        SUPA.from('traders').select('*').order('pnl',{ascending:false}),
-        SUPA.from('sessions').select('user_id,rr')
-      ]);
-      if(traderData){
-        const rrByUser = {};
-        if(sessionData) sessionData.forEach(s=>{ rrByUser[s.user_id]=(rrByUser[s.user_id]||0)+(s.rr||0); });
-        const mapped = traderData.filter(t=>t&&t.id&&t.display_name).map(t=>{
-          const correctRr = rrByUser[t.id]||0;
-          if(Math.abs((t.rr_made||0)-correctRr)>0.001){
-            SUPA.from('traders').update({rr_made:correctRr}).eq('id',t.id).then(()=>{});
-          }
-          return computeStats({id:t.id,name:t.display_name,pic:t.avatar_url,pnl:t.pnl||0,trades:t.trades||0,wins:t.wins||0,hidePnl:t.hide_pnl,role:t.role||'member',rrMade:correctRr});
-        });
+      const {data}=await SUPA.from('traders').select('*').order('pnl',{ascending:false});
+      if(data){
+        const mapped = data.filter(t=>t&&t.id&&t.display_name).map(t=>computeStats({id:t.id,name:t.display_name,pic:t.avatar_url,pnl:t.pnl||0,trades:t.trades||0,wins:t.wins||0,hidePnl:t.hide_pnl,role:t.role||'member',rrMade:t.rr_made||0}));
         setStudents(prev=>{ setPrevStudents(prev); return mapped; });
         setTableKey(k=>k+1);
         setLastSync(new Date());
@@ -1287,7 +1281,8 @@ function App() {
       const pnl   = ts.reduce((a,s)=>a+(s.pnl||0),0);
       const trades= ts.reduce((a,s)=>a+(s.trades||0),0);
       const wins  = ts.reduce((a,s)=>a+(s.wins||0),0);
-      const rrMade = ts.reduce((a,s)=>a+(s.rr||0),0);
+      const rrSessions = ts.filter(s=>s.rr>0);
+      const rrMade = rrSessions.length>0 ? rrSessions.reduce((a,s)=>a+(s.rr||0),0)/rrSessions.length : 0;
       return computeStats({...trader, pnl, trades, wins, rrMade});
     });
   },[students,sessions,timeFilter]);
@@ -1342,7 +1337,8 @@ function App() {
       const pnl    = rem.reduce((a,s)=>a+(s.pnl||0),0);
       const trades = rem.reduce((a,s)=>a+(s.trades||0),0);
       const wins   = rem.reduce((a,s)=>a+(s.wins||0),0);
-      const rr_made = rem.reduce((a,s)=>a+(s.rr||0),0);
+      const rrSessions = rem.filter(s=>s.rr>0);
+      const rr_made = rrSessions.length>0 ? rrSessions.reduce((a,s)=>a+(s.rr||0),0)/rrSessions.length : 0;
       const hide_pnl = rem.length===0 ? false : rem.some(s=>s.hide_pnl);
 
       // 3. Instantly update leaderboard UI — no waiting
@@ -1439,7 +1435,7 @@ function App() {
         trades:  cur.trades + data.trades,
         wins:    cur.wins   + data.wins,
         hide_pnl: data.hidePnl,
-        rr_made: (cur.rr_made||0) + (data.rr||0),
+        rr_made: data.rr > 0 ? ((cur.rr_made||0) * cur.trades + data.rr * data.trades) / (cur.trades + data.trades) : (cur.rr_made||0),
         updated_at: new Date().toISOString()
       }).eq('id',uid);
       /* log session */
@@ -1505,6 +1501,250 @@ function App() {
             })}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+            <div className="dl-orb" title="Download Leaderboard PNG" onClick={()=>{
+              const W=1200,ROW=62,H=Math.max(720,280+ranked.length*ROW+60);
+              const cv=document.createElement("canvas");
+              cv.width=W*2;cv.height=H*2;
+              const c=cv.getContext("2d");
+              c.scale(2,2);
+
+              // BG gradient
+              const bg=c.createLinearGradient(0,0,0,H);
+              bg.addColorStop(0,"#080812");bg.addColorStop(1,"#03030a");
+              c.fillStyle=bg;c.fillRect(0,0,W,H);
+
+              // Big orbs
+              const orb=(x,y,r,col)=>{const g=c.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,col);g.addColorStop(1,"rgba(0,0,0,0)");c.fillStyle=g;c.fillRect(0,0,W,H);};
+              orb(-60,60,380,"rgba(139,92,246,0.22)");
+              orb(W+80,H*0.3,340,"rgba(99,102,241,0.14)");
+              orb(W*0.5,H-40,300,"rgba(139,92,246,0.12)");
+              orb(W*0.85,H*0.55,220,"rgba(52,211,153,0.09)");
+
+              // Top bar accent line
+              const tl=c.createLinearGradient(0,0,W,0);
+              tl.addColorStop(0,"transparent");tl.addColorStop(0.3,"rgba(139,92,246,0.8)");tl.addColorStop(0.7,"rgba(99,102,241,0.6)");tl.addColorStop(1,"transparent");
+              c.strokeStyle=tl;c.lineWidth=2;
+              c.beginPath();c.moveTo(0,0);c.lineTo(W,0);c.stroke();
+
+              // TITLE — big bold
+              c.font="900 52px 'SF Pro Display',system-ui,-apple-system,sans-serif";
+              c.fillStyle="#ffffff";
+              c.shadowColor="rgba(139,92,246,0.5)";c.shadowBlur=30;
+              c.fillText("Leaderboard",40,72);
+              c.shadowBlur=0;
+
+              c.font="800 11px 'SF Mono','Courier New',monospace";
+              c.fillStyle="rgba(255,255,255,0.22)";
+              c.fillText("TOP DAY TRADERS  ·  RANKED BY P&L  ·  REAL-TIME",40,94);
+
+              // DATE — bold top right
+              const now=new Date();
+              const dateStr=now.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"}).toUpperCase();
+              c.textAlign="right";
+              c.font="900 16px 'SF Mono','Courier New',monospace";
+              c.fillStyle="#d8b4fe";
+              c.shadowColor="rgba(139,92,246,0.8)";c.shadowBlur=18;
+              c.fillText(dateStr,W-40,60);
+              c.shadowBlur=0;
+              c.font="800 11px 'SF Mono','Courier New',monospace";
+              c.fillStyle="rgba(167,139,250,0.65)";
+              c.fillText("TICKERS LEADERBOARD",W-40,80);
+              c.textAlign="left";
+
+              // STAT CARDS
+              const stats=[
+                {l:"ACTIVE TRADERS",v:String(totals.active),col:"#e0d7ff",glow:"rgba(139,92,246,0.12)"},
+                {l:"TOTAL P&L",v:fmt(totals.pnl),col:totals.pnl>=0?"#34d399":"#fb7185",glow:totals.pnl>=0?"rgba(52,211,153,0.14)":"rgba(251,113,133,0.14)"},
+                {l:"AVG WIN RATE",v:pct(totals.wr),col:"#86efac",glow:"rgba(52,211,153,0.12)"},
+                {l:"TOTAL TRADES",v:String(totals.trades),col:"#c4b5fd",glow:"rgba(139,92,246,0.12)"},
+                {l:"RR MADE",v:totals.rr>0?totals.rr.toFixed(1)+"R":"—",col:"#c4b5fd",glow:"rgba(139,92,246,0.15)"},
+              ];
+              const cw=(W-80)/5-8;
+              stats.forEach((s,i)=>{
+                const x=40+i*(cw+10),y=114,h=76;
+                // Card shadow
+                c.shadowColor="rgba(0,0,0,0.4)";c.shadowBlur=16;
+                c.fillStyle="rgba(255,255,255,0.04)";
+                roundRect(c,x,y,cw,h,14);c.fill();
+                c.shadowBlur=0;
+                // Card border
+                c.strokeStyle=s.glow?s.glow.replace("0.3","0.4").replace("0.35","0.4"):"rgba(255,255,255,0.08)";
+                c.lineWidth=1;roundRect(c,x,y,cw,h,14);c.stroke();
+                // Glow orb inside
+                if(s.glow){
+                  const cg=c.createRadialGradient(x+cw*0.8,y+h*0.2,0,x+cw*0.8,y+h*0.2,cw*0.7);
+                  cg.addColorStop(0,s.glow);cg.addColorStop(1,"rgba(0,0,0,0)");
+                  c.fillStyle=cg;roundRect(c,x,y,cw,h,14);c.fill();
+                }
+                // Label
+                c.font="700 9px 'SF Mono','Courier New',monospace";
+                c.fillStyle="rgba(255,255,255,0.35)";
+                c.fillText(s.l,x+14,y+22);
+                // Value — big bold
+                c.font="800 24px 'SF Mono','Courier New',monospace";
+                c.fillStyle=s.col;
+                if(s.glow){c.shadowColor=s.glow;c.shadowBlur=8;}
+                c.fillText(s.v,x+14,y+58);
+                c.shadowBlur=0;
+              });
+
+              // Section divider with glow
+              const div=c.createLinearGradient(40,0,W-40,0);
+              div.addColorStop(0,"transparent");div.addColorStop(0.2,"rgba(139,92,246,0.4)");div.addColorStop(0.8,"rgba(99,102,241,0.25)");div.addColorStop(1,"transparent");
+              c.strokeStyle=div;c.lineWidth=1;
+              c.beginPath();c.moveTo(40,206);c.lineTo(W-40,206);c.stroke();
+
+              // TABLE HEADER
+              const cols=[
+                {l:"#",x:40,rx:null},{l:"TRADER",x:90,rx:null},
+                {l:"P&L",rx:760},{l:"WIN %",rx:840},{l:"TRADES",rx:910},{l:"AVG RET",rx:990},{l:"RR MADE",rx:W-40}
+              ];
+              c.font="700 9px 'SF Mono','Courier New',monospace";
+              c.fillStyle="rgba(255,255,255,0.2)";
+              cols.forEach(col=>{
+                if(col.rx){c.textAlign="right";c.fillText(col.l,col.rx,228);}
+                else{c.textAlign="left";c.fillText(col.l,col.x,228);}
+              });
+              c.textAlign="left";
+
+              // ROWS — draw avatars async then save
+              const drawRows=(avatarImgs)=>{
+                ranked.forEach((t,i)=>{
+                  const ry=248+i*ROW;
+                  const rh=ROW-4;
+                  // Alt row bg
+                  if(i%2===0){
+                    c.fillStyle="rgba(255,255,255,0.02)";
+                    roundRect(c,38,ry-2,W-76,rh,8);c.fill();
+                  }
+                  // #1 left accent
+                  if(t.rank===1){
+                    const ag=c.createLinearGradient(38,ry-2,38,ry+rh);
+                    ag.addColorStop(0,"rgba(139,92,246,0.9)");ag.addColorStop(1,"rgba(99,102,241,0.4)");
+                    c.fillStyle=ag;c.fillRect(38,ry-2,3,rh);
+                  }
+                  // Rank
+                  c.textAlign="left";
+                  const medals=["🏆","🥈","🥉"];
+                  if(t.rank<=3){c.font="18px serif";c.fillText(medals[t.rank-1],40,ry+20);}
+                  else{c.font="700 12px 'SF Mono','Courier New',monospace";c.fillStyle="rgba(255,255,255,0.22)";c.fillText(String(t.rank),44,ry+20);}
+
+                  // Avatar — real pic if loaded, else colored circle
+                  const AX=88,AY=ry+14,AR=18;
+                  const hue=[258,280,240,310,265,250,295][t.name.charCodeAt(0)%7];
+                  const img=avatarImgs[t.id];
+                  if(img&&img.complete&&img.naturalWidth>0){
+                    c.save();c.beginPath();c.arc(AX,AY,AR,0,Math.PI*2);c.clip();
+                    c.drawImage(img,AX-AR,AY-AR,AR*2,AR*2);c.restore();
+                    // ring
+                    c.strokeStyle=`hsla(${hue},70%,65%,0.6)`;c.lineWidth=1.5;
+                    c.beginPath();c.arc(AX,AY,AR+1,0,Math.PI*2);c.stroke();
+                  } else {
+                    const ag=c.createRadialGradient(AX-4,AY-4,0,AX,AY,AR);
+                    ag.addColorStop(0,`hsl(${hue},70%,72%)`);ag.addColorStop(1,`hsl(${hue+30},80%,45%)`);
+                    c.fillStyle=ag;c.beginPath();c.arc(AX,AY,AR,0,Math.PI*2);c.fill();
+                    c.shadowColor=`hsla(${hue},80%,65%,0.6)`;c.shadowBlur=10;
+                    c.font="700 13px system-ui,sans-serif";c.fillStyle="#fff";
+                    c.textAlign="center";c.fillText(t.name[0].toUpperCase(),AX,AY+5);
+                    c.shadowBlur=0;c.textAlign="left";
+                  }
+
+                  // Name
+                  c.font="700 15px 'SF Pro Display',system-ui,sans-serif";
+                  c.fillStyle="rgba(255,255,255,0.93)";
+                  c.fillText(t.name,116,ry+20);
+
+                  // PnL
+                  const pnlCol=t.pnl>=0?"#34d399":"#fb7185";
+                  c.font="700 14px 'SF Mono','Courier New',monospace";
+                  c.fillStyle=pnlCol;
+                  c.shadowColor=pnlCol;c.shadowBlur=8;
+                  c.textAlign="right";
+                  c.fillText(t.hidePnl&&t.trades>0?"——":fmt(t.pnl),760,ry+20);
+                  c.shadowBlur=0;
+
+                  // Win%
+                  const wr=t.trades>0?(t.wins/t.trades)*100:0;
+                  c.fillStyle=wr>=60?"#86efac":wr>=40?"#fde68a":"#fb7185";
+                  c.fillText(pct(wr),840,ry+20);
+
+                  // Trades
+                  c.fillStyle="rgba(255,255,255,0.4)";
+                  c.fillText(String(t.trades),910,ry+20);
+
+                  // AvgRet
+                  c.fillStyle=t.avgReturn>=0?"rgba(134,239,172,0.85)":"rgba(251,113,133,0.85)";
+                  c.fillText(t.hidePnl&&t.trades>0?"——":fmtAvg(t.avgReturn),990,ry+20);
+
+                  // RR
+                  c.fillStyle=t.rrMade>=3?"#c4b5fd":t.rrMade>=2?"#a78bfa":"rgba(253,230,138,0.8)";
+                  c.shadowColor=t.rrMade>=2?"rgba(139,92,246,0.6)":"transparent";c.shadowBlur=t.rrMade>=2?8:0;
+                  c.fillText(t.rrMade>0?t.rrMade.toFixed(1)+"R":"—",W-40,ry+20);
+                  c.shadowBlur=0;c.textAlign="left";
+
+                  // Row divider
+                  c.strokeStyle="rgba(255,255,255,0.05)";c.lineWidth=1;
+                  c.beginPath();c.moveTo(40,ry+ROW-6);c.lineTo(W-40,ry+ROW-6);c.stroke();
+                });
+
+                // FOOTER
+                const fy=H-28;
+                c.font="700 9px 'SF Mono','Courier New',monospace";
+                c.fillStyle="rgba(255,255,255,0.2)";
+                c.fillText(ranked.length+" TRADER"+(ranked.length!==1?"S":"")+"  ·  TICKERS LEADERBOARD  ·  "+dateStr,40,fy);
+
+                // Download timestamp stamp bottom right
+                const dlNow=new Date();
+                const dlStamp="DOWNLOADED "+dlNow.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"}).toUpperCase()+" · "+dlNow.toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"});
+                c.font="700 8px 'SF Mono','Courier New',monospace";
+                c.fillStyle="rgba(167,139,250,0.45)";
+                c.textAlign="right";
+                c.fillText(dlStamp,W-40,fy);
+                c.textAlign="left";
+
+                // Bottom glow line
+                const gl=c.createLinearGradient(0,H-3,W,H-3);
+                gl.addColorStop(0,"transparent");gl.addColorStop(0.3,"rgba(139,92,246,0.7)");gl.addColorStop(0.7,"rgba(99,102,241,0.5)");gl.addColorStop(1,"transparent");
+                c.strokeStyle=gl;c.lineWidth=2;
+                c.beginPath();c.moveTo(0,H-3);c.lineTo(W,H-3);c.stroke();
+
+                const dataUrl=cv.toDataURL("image/png");
+                const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
+                if(isIOS){
+                  // iOS: open image in new tab so user can long-press save
+                  const w=window.open();
+                  if(w){
+                    w.document.write('<html><head><title>Tickers Leaderboard</title><meta name="viewport" content="width=device-width"/><style>body{margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;}img{max-width:100%;border-radius:8px;}</style></head><body><img src="'+dataUrl+'"/><p style="color:#fff;font-family:monospace;text-align:center;font-size:12px;padding:12px">Long press image → Save to Photos</p></body></html>');
+                    w.document.close();
+                  }
+                } else {
+                  const filterLabel={"all":"alltime","today":"today","week":"week","month":"month"}[timeFilter]||"alltime";
+                  const d=new Date();
+                  const mo=d.toLocaleString("en-US",{month:"short"}).toLowerCase();
+                  const dy=d.getDate();const yr=d.getFullYear();
+                  const fname="tickers-"+filterLabel+"-"+mo+dy+"-"+yr+".png";
+                  const a=document.createElement("a");
+                  a.href=dataUrl;
+                  a.download=fname;
+                  a.click();
+                }
+              };
+
+              // Load real avatar images
+              const avatarImgs={};
+              const toLoad=ranked.filter(t=>t.pic);
+              if(toLoad.length===0){drawRows(avatarImgs);return;}
+              let loaded=0;
+              toLoad.forEach(t=>{
+                const img=new Image();
+                img.crossOrigin="anonymous";
+                img.onload=()=>{avatarImgs[t.id]=img;loaded++;if(loaded===toLoad.length)drawRows(avatarImgs);};
+                img.onerror=()=>{loaded++;if(loaded===toLoad.length)drawRows(avatarImgs);};
+                img.src=t.pic;
+              });
+            }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><polyline points="7,10 12,15 17,10" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><line x1="12" y1="15" x2="12" y2="3" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinecap="round"/></svg>
+            </div>
             <div style={{display:"flex",alignItems:"center",gap:5,fontSize:10,fontFamily:MONO,letterSpacing:"0.07em",color:"rgba(52,211,153,0.9)"}}>
               <span style={{width:5,height:5,borderRadius:"50%",background:G,display:"inline-block",boxShadow:`0 0 ${4+livePulse*8}px ${G}`}}/>
               <span className="hide-mobile">LIVE</span>
@@ -1654,6 +1894,9 @@ function App() {
     </div>
   );
 }
+
+
+function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();}
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
