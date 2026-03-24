@@ -1716,21 +1716,10 @@ function App() {
                 const fname="tickers-"+filterLabel+"-"+mo+dy+"-"+yr+".png";
                 const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
                 if(isIOS){
-                  const overlay=document.createElement("div");
-                  overlay.style.cssText="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;";
-                  const hint=document.createElement("div");
-                  hint.style.cssText="font-family:'SF Mono',monospace;font-size:12px;font-weight:700;color:rgba(196,181,253,0.9);letter-spacing:0.1em;margin-bottom:14px;text-align:center;";
-                  hint.textContent="HOLD IMAGE → SAVE TO PHOTOS";
-                  const img=document.createElement("img");
-                  img.src=dataUrl;
-                  img.style.cssText="max-width:100%;max-height:72vh;border-radius:12px;box-shadow:0 0 50px rgba(139,92,246,0.25);";
-                  const closeBtn=document.createElement("button");
-                  closeBtn.textContent="✕  CLOSE";
-                  closeBtn.style.cssText="margin-top:16px;padding:11px 32px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.3);border-radius:99px;color:rgba(196,181,253,0.9);font-family:'SF Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;cursor:pointer;";
-                  closeBtn.onclick=()=>document.body.removeChild(overlay);
-                  overlay.onclick=(e)=>{if(e.target===overlay)document.body.removeChild(overlay);};
-                  overlay.appendChild(hint);overlay.appendChild(img);overlay.appendChild(closeBtn);
-                  document.body.appendChild(overlay);
+                  // Update the already-visible overlay with the rendered image
+                  const hintEl=document.getElementById("dl-hint");
+                  if(hintEl)hintEl.textContent="HOLD IMAGE → SAVE TO PHOTOS";
+                  if(iosImg){iosImg.src=dataUrl;iosImg.style.display="block";}
                 } else {
                   const a=document.createElement("a");
                   a.href=dataUrl;
@@ -1739,17 +1728,50 @@ function App() {
                 }
               };
 
-              // Load real avatar images
+              // Show overlay immediately on iOS so user sees instant response
+              const isIOS2=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
+              let iosOverlay=null,iosImg=null;
+              if(isIOS2){
+                iosOverlay=document.createElement("div");
+                iosOverlay.style.cssText="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;";
+                const hint=document.createElement("div");
+                hint.style.cssText="font-family:'SF Mono',monospace;font-size:12px;font-weight:700;color:rgba(196,181,253,0.9);letter-spacing:0.1em;margin-bottom:14px;text-align:center;";
+                hint.textContent="GENERATING...";
+                hint.id="dl-hint";
+                iosImg=document.createElement("img");
+                iosImg.style.cssText="max-width:100%;max-height:72vh;border-radius:12px;box-shadow:0 0 50px rgba(139,92,246,0.25);display:none;";
+                const closeBtn=document.createElement("button");
+                closeBtn.textContent="✕  CLOSE";
+                closeBtn.style.cssText="margin-top:16px;padding:11px 32px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.3);border-radius:99px;color:rgba(196,181,253,0.9);font-family:'SF Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;cursor:pointer;";
+                closeBtn.onclick=()=>document.body.removeChild(iosOverlay);
+                iosOverlay.onclick=(e)=>{if(e.target===iosOverlay)document.body.removeChild(iosOverlay);};
+                iosOverlay.appendChild(hint);iosOverlay.appendChild(iosImg);iosOverlay.appendChild(closeBtn);
+                document.body.appendChild(iosOverlay);
+              }
+
+              // Override drawRows to inject iOS overlay or trigger download
+              const origDrawRows=drawRows;
+              const wrappedDraw=(imgs)=>{
+                origDrawRows(imgs);
+                // drawRows already calls download/overlay inside it — nothing extra needed
+              };
+
+              // Load avatars with short timeout fallback so it never hangs
               const avatarImgs={};
               const toLoad=ranked.filter(t=>t.pic);
               if(toLoad.length===0){drawRows(avatarImgs);return;}
               let loaded=0;
+              const done=()=>{loaded++;if(loaded===toLoad.length)drawRows(avatarImgs);};
+              // 2s max timeout — if images don't load, proceed without them
+              const timeout=setTimeout(()=>{if(loaded<toLoad.length)drawRows(avatarImgs);},2000);
+              const origDraw=drawRows;
+              drawRows=(imgs)=>{clearTimeout(timeout);origDraw(imgs);};
               toLoad.forEach(t=>{
                 const img=new Image();
                 img.crossOrigin="anonymous";
-                img.onload=()=>{avatarImgs[t.id]=img;loaded++;if(loaded===toLoad.length)drawRows(avatarImgs);};
-                img.onerror=()=>{loaded++;if(loaded===toLoad.length)drawRows(avatarImgs);};
-                img.src=t.pic;
+                img.onload=()=>{avatarImgs[t.id]=img;done();};
+                img.onerror=()=>{done();};
+                img.src=t.pic+"?"+(Date.now()); // cache bust for crossOrigin
               });
             }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><polyline points="7,10 12,15 17,10" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><line x1="12" y1="15" x2="12" y2="3" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinecap="round"/></svg>
