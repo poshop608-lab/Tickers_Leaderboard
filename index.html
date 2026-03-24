@@ -1502,213 +1502,149 @@ function App() {
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
             <div className="dl-orb" title="Download Leaderboard PNG" onClick={()=>{
-              const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
 
-              // iOS: show overlay immediately on tap for instant feedback
-              // Desktop: no overlay needed — direct download
-              let overlay=null,hint=null,spinner=null,previewImg=null,closeBtn=null;
-              if(isIOS){
-                overlay=document.createElement("div");
-                overlay.style.cssText="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.93);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:14px;";
-                hint=document.createElement("div");
-                hint.style.cssText="font-family:'SF Mono',monospace;font-size:12px;font-weight:700;color:rgba(196,181,253,0.85);letter-spacing:0.1em;text-align:center;";
-                hint.textContent="GENERATING...";
-                spinner=document.createElement("div");
-                spinner.style.cssText="width:28px;height:28px;border:2px solid rgba(139,92,246,0.2);border-top:2px solid rgba(196,181,253,0.8);border-radius:50%;animation:spin 0.7s linear infinite;";
-                previewImg=document.createElement("img");
-                previewImg.style.cssText="max-width:100%;max-height:70vh;border-radius:12px;box-shadow:0 0 50px rgba(139,92,246,0.25);display:none;";
-                closeBtn=document.createElement("button");
-                closeBtn.textContent="✕  CLOSE";
-                closeBtn.style.cssText="padding:10px 28px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.3);border-radius:99px;color:rgba(196,181,253,0.9);font-family:'SF Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;cursor:pointer;display:none;";
-                closeBtn.onclick=()=>document.body.removeChild(overlay);
-                overlay.onclick=(e)=>{if(e.target===overlay)document.body.removeChild(overlay);};
-                overlay.appendChild(hint);overlay.appendChild(spinner);overlay.appendChild(previewImg);overlay.appendChild(closeBtn);
-                document.body.appendChild(overlay);
-              }
+  let overlay=null,hint=null,spinner=null,previewImg=null,closeBtn=null;
+  if(isIOS){
+    overlay=document.createElement("div");
+    overlay.style.cssText="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.93);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:14px;";
+    hint=document.createElement("div");
+    hint.style.cssText="font-family:'SF Mono',monospace;font-size:12px;font-weight:700;color:rgba(196,181,253,0.85);letter-spacing:0.1em;text-align:center;";
+    hint.textContent="GENERATING...";
+    spinner=document.createElement("div");
+    spinner.style.cssText="width:28px;height:28px;border:2px solid rgba(139,92,246,0.2);border-top:2px solid rgba(196,181,253,0.8);border-radius:50%;animation:spin 0.7s linear infinite;";
+    previewImg=document.createElement("img");
+    previewImg.style.cssText="max-width:100%;max-height:70vh;border-radius:12px;box-shadow:0 0 50px rgba(139,92,246,0.25);display:none;";
+    closeBtn=document.createElement("button");
+    closeBtn.textContent="✕  CLOSE";
+    closeBtn.style.cssText="padding:10px 28px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.3);border-radius:99px;color:rgba(196,181,253,0.9);font-family:'SF Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;cursor:pointer;display:none;";
+    closeBtn.onclick=()=>document.body.removeChild(overlay);
+    overlay.onclick=(e)=>{if(e.target===overlay)document.body.removeChild(overlay);};
+    overlay.appendChild(hint);overlay.appendChild(spinner);overlay.appendChild(previewImg);overlay.appendChild(closeBtn);
+    document.body.appendChild(overlay);
+  }
 
-              const buildCanvas=(avatarImgs)=>{
-                const W=1200,ROW=62,H=Math.max(720,280+ranked.length*ROW+60);
-                const cv=document.createElement("canvas");
-                cv.width=W*2;cv.height=H*2;
-                const c=cv.getContext("2d");
-                c.scale(2,2);
+  const buildCanvas=(avatarImgs)=>{
+    const W=1200,ROW=62,H=Math.max(720,280+ranked.length*ROW+60);
+    const cv=document.createElement("canvas");
+    cv.width=W*2;cv.height=H*2;
+    const c=cv.getContext("2d");
+    c.scale(2,2);
+    const bg=c.createLinearGradient(0,0,0,H);
+    bg.addColorStop(0,"#080812");bg.addColorStop(1,"#03030a");
+    c.fillStyle=bg;c.fillRect(0,0,W,H);
+    const orb=(x,y,r,col)=>{const g=c.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,col);g.addColorStop(1,"rgba(0,0,0,0)");c.fillStyle=g;c.fillRect(0,0,W,H);};
+    orb(-60,60,380,"rgba(139,92,246,0.22)");orb(W+80,H*0.3,340,"rgba(99,102,241,0.14)");orb(W*0.5,H-40,300,"rgba(139,92,246,0.12)");orb(W*0.85,H*0.55,220,"rgba(52,211,153,0.09)");
+    const tl=c.createLinearGradient(0,0,W,0);tl.addColorStop(0,"transparent");tl.addColorStop(0.3,"rgba(139,92,246,0.8)");tl.addColorStop(0.7,"rgba(99,102,241,0.6)");tl.addColorStop(1,"transparent");
+    c.strokeStyle=tl;c.lineWidth=2;c.beginPath();c.moveTo(0,0);c.lineTo(W,0);c.stroke();
+    c.font="900 52px system-ui,-apple-system,sans-serif";c.fillStyle="#ffffff";c.shadowColor="rgba(139,92,246,0.5)";c.shadowBlur=30;c.fillText("Leaderboard",40,72);c.shadowBlur=0;
+    c.font="800 11px 'Courier New',monospace";c.fillStyle="rgba(255,255,255,0.22)";c.fillText("TOP DAY TRADERS  ·  RANKED BY P&L  ·  REAL-TIME",40,94);
+    const now=new Date();const dateStr=now.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"}).toUpperCase();
+    c.textAlign="right";c.font="900 16px 'Courier New',monospace";c.fillStyle="#d8b4fe";c.shadowColor="rgba(139,92,246,0.8)";c.shadowBlur=18;c.fillText(dateStr,W-40,60);c.shadowBlur=0;
+    c.font="800 11px 'Courier New',monospace";c.fillStyle="rgba(167,139,250,0.65)";c.fillText("TICKERS LEADERBOARD",W-40,80);c.textAlign="left";
+    const stats=[{l:"ACTIVE TRADERS",v:String(totals.active),col:"#e0d7ff",glow:"rgba(139,92,246,0.12)"},{l:"TOTAL P&L",v:fmt(totals.pnl),col:totals.pnl>=0?"#34d399":"#fb7185",glow:totals.pnl>=0?"rgba(52,211,153,0.14)":"rgba(251,113,133,0.14)"},{l:"AVG WIN RATE",v:pct(totals.wr),col:"#86efac",glow:"rgba(52,211,153,0.12)"},{l:"TOTAL TRADES",v:String(totals.trades),col:"#c4b5fd",glow:"rgba(139,92,246,0.12)"},{l:"RR MADE",v:totals.rr>0?totals.rr.toFixed(1)+"R":"—",col:"#c4b5fd",glow:"rgba(139,92,246,0.15)"}];
+    const cw=(W-80)/5-8;
+    stats.forEach((s,i)=>{const x=40+i*(cw+10),y=114,h=76;c.shadowColor="rgba(0,0,0,0.4)";c.shadowBlur=16;c.fillStyle="rgba(255,255,255,0.04)";roundRect(c,x,y,cw,h,14);c.fill();c.shadowBlur=0;c.strokeStyle=s.glow.replace("0.12","0.4").replace("0.14","0.4").replace("0.15","0.4");c.lineWidth=1;roundRect(c,x,y,cw,h,14);c.stroke();if(s.glow){const cg=c.createRadialGradient(x+cw*0.8,y+h*0.2,0,x+cw*0.8,y+h*0.2,cw*0.7);cg.addColorStop(0,s.glow);cg.addColorStop(1,"rgba(0,0,0,0)");c.fillStyle=cg;roundRect(c,x,y,cw,h,14);c.fill();}c.font="700 9px 'Courier New',monospace";c.fillStyle="rgba(255,255,255,0.35)";c.fillText(s.l,x+14,y+22);c.font="800 24px 'Courier New',monospace";c.fillStyle=s.col;c.shadowColor=s.glow;c.shadowBlur=8;c.fillText(s.v,x+14,y+58);c.shadowBlur=0;});
+    const div=c.createLinearGradient(40,0,W-40,0);div.addColorStop(0,"transparent");div.addColorStop(0.2,"rgba(139,92,246,0.4)");div.addColorStop(0.8,"rgba(99,102,241,0.25)");div.addColorStop(1,"transparent");c.strokeStyle=div;c.lineWidth=1;c.beginPath();c.moveTo(40,206);c.lineTo(W-40,206);c.stroke();
+    const cols=[{l:"#",x:40},{l:"TRADER",x:90},{l:"P&L",rx:760},{l:"WIN %",rx:840},{l:"TRADES",rx:910},{l:"AVG RET",rx:990},{l:"RR MADE",rx:W-40}];
+    c.font="700 9px 'Courier New',monospace";c.fillStyle="rgba(255,255,255,0.2)";cols.forEach(col=>{if(col.rx){c.textAlign="right";c.fillText(col.l,col.rx,228);}else{c.textAlign="left";c.fillText(col.l,col.x,228);}});c.textAlign="left";
+    ranked.forEach((t,i)=>{
+      const ry=248+i*ROW,rh=ROW-4;
+      if(i%2===0){c.fillStyle="rgba(255,255,255,0.02)";roundRect(c,38,ry-2,W-76,rh,8);c.fill();}
+      if(t.rank===1){const ag=c.createLinearGradient(38,ry-2,38,ry+rh);ag.addColorStop(0,"rgba(139,92,246,0.9)");ag.addColorStop(1,"rgba(99,102,241,0.4)");c.fillStyle=ag;c.fillRect(38,ry-2,3,rh);}
+      c.textAlign="left";const medals=["🏆","🥈","🥉"];
+      if(t.rank<=3){c.font="18px serif";c.fillText(medals[t.rank-1],40,ry+20);}else{c.font="700 12px 'Courier New',monospace";c.fillStyle="rgba(255,255,255,0.22)";c.fillText(String(t.rank),44,ry+20);}
+      const AX=88,AY=ry+14,AR=18;const hue=[258,280,240,310,265,250,295][t.name.charCodeAt(0)%7];const img=avatarImgs[t.id];
+      if(img){try{c.save();c.beginPath();c.arc(AX,AY,AR,0,Math.PI*2);c.clip();c.drawImage(img,AX-AR,AY-AR,AR*2,AR*2);c.restore();c.strokeStyle=`hsla(${hue},70%,65%,0.6)`;c.lineWidth=1.5;c.beginPath();c.arc(AX,AY,AR+1,0,Math.PI*2);c.stroke();}catch(e){drawInitial(c,AX,AY,AR,hue,t.name);}}else{drawInitial(c,AX,AY,AR,hue,t.name);}
+      c.font="700 15px system-ui,sans-serif";c.fillStyle="rgba(255,255,255,0.93)";c.fillText(t.name,116,ry+20);
+      const pnlCol=t.pnl>=0?"#34d399":"#fb7185";c.font="700 14px 'Courier New',monospace";c.fillStyle=pnlCol;c.shadowColor=pnlCol;c.shadowBlur=8;c.textAlign="right";c.fillText(t.hidePnl&&t.trades>0?"——":fmt(t.pnl),760,ry+20);c.shadowBlur=0;
+      const wr=t.trades>0?(t.wins/t.trades)*100:0;c.fillStyle=wr>=60?"#86efac":wr>=40?"#fde68a":"#fb7185";c.fillText(pct(wr),840,ry+20);c.fillStyle="rgba(255,255,255,0.4)";c.fillText(String(t.trades),910,ry+20);c.fillStyle=t.avgReturn>=0?"rgba(134,239,172,0.85)":"rgba(251,113,133,0.85)";c.fillText(t.hidePnl&&t.trades>0?"——":fmtAvg(t.avgReturn),990,ry+20);
+      c.fillStyle=t.rrMade>=3?"#c4b5fd":t.rrMade>=2?"#a78bfa":"rgba(253,230,138,0.8)";c.shadowColor=t.rrMade>=2?"rgba(139,92,246,0.6)":"transparent";c.shadowBlur=t.rrMade>=2?8:0;c.fillText(t.rrMade>0?t.rrMade.toFixed(1)+"R":"—",W-40,ry+20);c.shadowBlur=0;c.textAlign="left";
+      c.strokeStyle="rgba(255,255,255,0.05)";c.lineWidth=1;c.beginPath();c.moveTo(40,ry+ROW-6);c.lineTo(W-40,ry+ROW-6);c.stroke();
+    });
+    const fy=H-28;c.font="700 9px 'Courier New',monospace";c.fillStyle="rgba(255,255,255,0.2)";c.fillText(ranked.length+" TRADER"+(ranked.length!==1?"S":"")+"  ·  TICKERS LEADERBOARD  ·  "+dateStr,40,fy);
+    const dlNow=new Date();const dlStamp="DOWNLOADED "+dlNow.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"}).toUpperCase()+" · "+dlNow.toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"});
+    c.font="700 8px 'Courier New',monospace";c.fillStyle="rgba(167,139,250,0.45)";c.textAlign="right";c.fillText(dlStamp,W-40,fy);c.textAlign="left";
+    const gl=c.createLinearGradient(0,H-3,W,H-3);gl.addColorStop(0,"transparent");gl.addColorStop(0.3,"rgba(139,92,246,0.7)");gl.addColorStop(0.7,"rgba(99,102,241,0.5)");gl.addColorStop(1,"transparent");c.strokeStyle=gl;c.lineWidth=2;c.beginPath();c.moveTo(0,H-3);c.lineTo(W,H-3);c.stroke();
+    return cv;
+  };
 
-                const bg=c.createLinearGradient(0,0,0,H);
-                bg.addColorStop(0,"#080812");bg.addColorStop(1,"#03030a");
-                c.fillStyle=bg;c.fillRect(0,0,W,H);
+  const drawInitial=(c,x,y,r,hue,name)=>{
+    const ag=c.createRadialGradient(x-4,y-4,0,x,y,r);ag.addColorStop(0,`hsl(${hue},70%,72%)`);ag.addColorStop(1,`hsl(${hue+30},80%,45%)`);
+    c.fillStyle=ag;c.beginPath();c.arc(x,y,r,0,Math.PI*2);c.fill();
+    c.shadowColor=`hsla(${hue},80%,65%,0.6)`;c.shadowBlur=10;c.font="700 13px system-ui,sans-serif";c.fillStyle="#fff";c.textAlign="center";c.fillText(name[0].toUpperCase(),x,y+5);c.shadowBlur=0;c.textAlign="left";
+  };
 
-                const orb=(x,y,r,col)=>{const g=c.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,col);g.addColorStop(1,"rgba(0,0,0,0)");c.fillStyle=g;c.fillRect(0,0,W,H);};
-                orb(-60,60,380,"rgba(139,92,246,0.22)");
-                orb(W+80,H*0.3,340,"rgba(99,102,241,0.14)");
-                orb(W*0.5,H-40,300,"rgba(139,92,246,0.12)");
-                orb(W*0.85,H*0.55,220,"rgba(52,211,153,0.09)");
+  /* FIX 1: use a state object so all async callbacks share the same "done" flag */
+  const state={done:false,timer:null};
 
-                const tl=c.createLinearGradient(0,0,W,0);
-                tl.addColorStop(0,"transparent");tl.addColorStop(0.3,"rgba(139,92,246,0.8)");tl.addColorStop(0.7,"rgba(99,102,241,0.6)");tl.addColorStop(1,"transparent");
-                c.strokeStyle=tl;c.lineWidth=2;c.beginPath();c.moveTo(0,0);c.lineTo(W,0);c.stroke();
+  const doFinish=(avatarImgs)=>{
+    if(state.done) return;
+    state.done=true;
+    clearTimeout(state.timer);
+    const cv=buildCanvas(avatarImgs);
+    const dataUrl=cv.toDataURL("image/png");
+    const filterLabel={"all":"alltime","today":"today","week":"week","month":"month"}[timeFilter]||"alltime";
+    const d=new Date();const mo=d.toLocaleString("en-US",{month:"short"}).toLowerCase();
+    const fname="tickers-"+filterLabel+"-"+mo+d.getDate()+"-"+d.getFullYear()+".png";
+    if(isIOS){
+      hint.textContent="HOLD IMAGE → SAVE TO PHOTOS";
+      spinner.style.display="none";
+      previewImg.src=dataUrl;previewImg.style.display="block";closeBtn.style.display="block";
+    } else {
+      const a=document.createElement("a");a.href=dataUrl;a.download=fname;a.click();
+    }
+  };
 
-                c.font="900 52px system-ui,-apple-system,sans-serif";
-                c.fillStyle="#ffffff";c.shadowColor="rgba(139,92,246,0.5)";c.shadowBlur=30;
-                c.fillText("Leaderboard",40,72);c.shadowBlur=0;
-                c.font="800 11px 'Courier New',monospace";
-                c.fillStyle="rgba(255,255,255,0.22)";
-                c.fillText("TOP DAY TRADERS  ·  RANKED BY P&L  ·  REAL-TIME",40,94);
+  const avatarImgs={};
+  const toLoad=ranked.filter(t=>t.pic);
+  if(toLoad.length===0){doFinish(avatarImgs);return;}
 
-                const now=new Date();
-                const dateStr=now.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"}).toUpperCase();
-                c.textAlign="right";
-                c.font="900 16px 'Courier New',monospace";
-                c.fillStyle="#d8b4fe";c.shadowColor="rgba(139,92,246,0.8)";c.shadowBlur=18;
-                c.fillText(dateStr,W-40,60);c.shadowBlur=0;
-                c.font="800 11px 'Courier New',monospace";
-                c.fillStyle="rgba(167,139,250,0.65)";
-                c.fillText("TICKERS LEADERBOARD",W-40,80);
-                c.textAlign="left";
+  let doneCount=0;
+  const blobUrls=[];
+  /* FIX 2: 5s safety timeout using state.timer so it is properly cleared */
+  state.timer=setTimeout(()=>doFinish(avatarImgs),5000);
 
-                const stats=[
-                  {l:"ACTIVE TRADERS",v:String(totals.active),col:"#e0d7ff",glow:"rgba(139,92,246,0.12)"},
-                  {l:"TOTAL P&L",v:fmt(totals.pnl),col:totals.pnl>=0?"#34d399":"#fb7185",glow:totals.pnl>=0?"rgba(52,211,153,0.14)":"rgba(251,113,133,0.14)"},
-                  {l:"AVG WIN RATE",v:pct(totals.wr),col:"#86efac",glow:"rgba(52,211,153,0.12)"},
-                  {l:"TOTAL TRADES",v:String(totals.trades),col:"#c4b5fd",glow:"rgba(139,92,246,0.12)"},
-                  {l:"RR MADE",v:totals.rr>0?totals.rr.toFixed(1)+"R":"—",col:"#c4b5fd",glow:"rgba(139,92,246,0.15)"},
-                ];
-                const cw=(W-80)/5-8;
-                stats.forEach((s,i)=>{
-                  const x=40+i*(cw+10),y=114,h=76;
-                  c.shadowColor="rgba(0,0,0,0.4)";c.shadowBlur=16;
-                  c.fillStyle="rgba(255,255,255,0.04)";
-                  roundRect(c,x,y,cw,h,14);c.fill();c.shadowBlur=0;
-                  c.strokeStyle=s.glow.replace("0.12","0.4").replace("0.14","0.4").replace("0.15","0.4");
-                  c.lineWidth=1;roundRect(c,x,y,cw,h,14);c.stroke();
-                  if(s.glow){const cg=c.createRadialGradient(x+cw*0.8,y+h*0.2,0,x+cw*0.8,y+h*0.2,cw*0.7);cg.addColorStop(0,s.glow);cg.addColorStop(1,"rgba(0,0,0,0)");c.fillStyle=cg;roundRect(c,x,y,cw,h,14);c.fill();}
-                  c.font="700 9px 'Courier New',monospace";c.fillStyle="rgba(255,255,255,0.35)";c.fillText(s.l,x+14,y+22);
-                  c.font="800 24px 'Courier New',monospace";c.fillStyle=s.col;
-                  c.shadowColor=s.glow;c.shadowBlur=8;c.fillText(s.v,x+14,y+58);c.shadowBlur=0;
-                });
+  const checkDone=()=>{doneCount++;if(doneCount===toLoad.length)doFinish(avatarImgs);};
 
-                const div=c.createLinearGradient(40,0,W-40,0);
-                div.addColorStop(0,"transparent");div.addColorStop(0.2,"rgba(139,92,246,0.4)");div.addColorStop(0.8,"rgba(99,102,241,0.25)");div.addColorStop(1,"transparent");
-                c.strokeStyle=div;c.lineWidth=1;c.beginPath();c.moveTo(40,206);c.lineTo(W-40,206);c.stroke();
+  /* FIX 3: 3-tier avatar loading: fetch->blob → crossOrigin img → taint-check img → initials */
+  const tryDirectImg=(t,onDone,imgMap)=>{
+    const img=new Image();
+    img.crossOrigin="anonymous";
+    img.onload=()=>{imgMap[t.id]=img;onDone();};
+    img.onerror=()=>{
+      /* last resort: no crossOrigin (tainted canvas is ok for display-only) */
+      const img2=new Image();
+      img2.onload=()=>{
+        try{
+          const tc=document.createElement("canvas");tc.width=4;tc.height=4;
+          const tx=tc.getContext("2d");tx.drawImage(img2,0,0,4,4);
+          tx.getImageData(0,0,1,1); /* throws if tainted */
+          imgMap[t.id]=img2;
+        }catch(e){/* tainted — skip, initials will render */}
+        onDone();
+      };
+      img2.onerror=()=>onDone();
+      img2.src=t.pic;
+    };
+    /* cache-bust helps Supabase send fresh CORS headers */
+    img.src=t.pic+(t.pic.includes("?")?"&":"?")+"_cb="+Date.now();
+  };
 
-                const cols=[{l:"#",x:40},{l:"TRADER",x:90},{l:"P&L",rx:760},{l:"WIN %",rx:840},{l:"TRADES",rx:910},{l:"AVG RET",rx:990},{l:"RR MADE",rx:W-40}];
-                c.font="700 9px 'Courier New',monospace";c.fillStyle="rgba(255,255,255,0.2)";
-                cols.forEach(col=>{if(col.rx){c.textAlign="right";c.fillText(col.l,col.rx,228);}else{c.textAlign="left";c.fillText(col.l,col.x,228);}});
-                c.textAlign="left";
-
-                ranked.forEach((t,i)=>{
-                  const ry=248+i*ROW,rh=ROW-4;
-                  if(i%2===0){c.fillStyle="rgba(255,255,255,0.02)";roundRect(c,38,ry-2,W-76,rh,8);c.fill();}
-                  if(t.rank===1){const ag=c.createLinearGradient(38,ry-2,38,ry+rh);ag.addColorStop(0,"rgba(139,92,246,0.9)");ag.addColorStop(1,"rgba(99,102,241,0.4)");c.fillStyle=ag;c.fillRect(38,ry-2,3,rh);}
-
-                  c.textAlign="left";
-                  const medals=["🏆","🥈","🥉"];
-                  if(t.rank<=3){c.font="18px serif";c.fillText(medals[t.rank-1],40,ry+20);}
-                  else{c.font="700 12px 'Courier New',monospace";c.fillStyle="rgba(255,255,255,0.22)";c.fillText(String(t.rank),44,ry+20);}
-
-                  const AX=88,AY=ry+14,AR=18;
-                  const hue=[258,280,240,310,265,250,295][t.name.charCodeAt(0)%7];
-                  const img=avatarImgs[t.id];
-                  if(img){
-                    try{
-                      c.save();c.beginPath();c.arc(AX,AY,AR,0,Math.PI*2);c.clip();
-                      c.drawImage(img,AX-AR,AY-AR,AR*2,AR*2);c.restore();
-                      c.strokeStyle=`hsla(${hue},70%,65%,0.6)`;c.lineWidth=1.5;
-                      c.beginPath();c.arc(AX,AY,AR+1,0,Math.PI*2);c.stroke();
-                    }catch(e){drawInitial(c,AX,AY,AR,hue,t.name);}
-                  } else {drawInitial(c,AX,AY,AR,hue,t.name);}
-
-                  c.font="700 15px system-ui,sans-serif";c.fillStyle="rgba(255,255,255,0.93)";c.fillText(t.name,116,ry+20);
-
-                  const pnlCol=t.pnl>=0?"#34d399":"#fb7185";
-                  c.font="700 14px 'Courier New',monospace";c.fillStyle=pnlCol;
-                  c.shadowColor=pnlCol;c.shadowBlur=8;c.textAlign="right";
-                  c.fillText(t.hidePnl&&t.trades>0?"——":fmt(t.pnl),760,ry+20);c.shadowBlur=0;
-
-                  const wr=t.trades>0?(t.wins/t.trades)*100:0;
-                  c.fillStyle=wr>=60?"#86efac":wr>=40?"#fde68a":"#fb7185";
-                  c.fillText(pct(wr),840,ry+20);
-                  c.fillStyle="rgba(255,255,255,0.4)";c.fillText(String(t.trades),910,ry+20);
-                  c.fillStyle=t.avgReturn>=0?"rgba(134,239,172,0.85)":"rgba(251,113,133,0.85)";
-                  c.fillText(t.hidePnl&&t.trades>0?"——":fmtAvg(t.avgReturn),990,ry+20);
-                  c.fillStyle=t.rrMade>=3?"#c4b5fd":t.rrMade>=2?"#a78bfa":"rgba(253,230,138,0.8)";
-                  c.shadowColor=t.rrMade>=2?"rgba(139,92,246,0.6)":"transparent";c.shadowBlur=t.rrMade>=2?8:0;
-                  c.fillText(t.rrMade>0?t.rrMade.toFixed(1)+"R":"—",W-40,ry+20);
-                  c.shadowBlur=0;c.textAlign="left";
-                  c.strokeStyle="rgba(255,255,255,0.05)";c.lineWidth=1;
-                  c.beginPath();c.moveTo(40,ry+ROW-6);c.lineTo(W-40,ry+ROW-6);c.stroke();
-                });
-
-                const fy=H-28;
-                c.font="700 9px 'Courier New',monospace";c.fillStyle="rgba(255,255,255,0.2)";
-                c.fillText(ranked.length+" TRADER"+(ranked.length!==1?"S":"")+"  ·  TICKERS LEADERBOARD  ·  "+dateStr,40,fy);
-                const dlNow=new Date();
-                const dlStamp="DOWNLOADED "+dlNow.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"}).toUpperCase()+" · "+dlNow.toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"});
-                c.font="700 8px 'Courier New',monospace";c.fillStyle="rgba(167,139,250,0.45)";
-                c.textAlign="right";c.fillText(dlStamp,W-40,fy);c.textAlign="left";
-
-                const gl=c.createLinearGradient(0,H-3,W,H-3);
-                gl.addColorStop(0,"transparent");gl.addColorStop(0.3,"rgba(139,92,246,0.7)");gl.addColorStop(0.7,"rgba(99,102,241,0.5)");gl.addColorStop(1,"transparent");
-                c.strokeStyle=gl;c.lineWidth=2;c.beginPath();c.moveTo(0,H-3);c.lineTo(W,H-3);c.stroke();
-
-                return cv;
-              };
-
-              const drawInitial=(c,x,y,r,hue,name)=>{
-                const ag=c.createRadialGradient(x-4,y-4,0,x,y,r);
-                ag.addColorStop(0,`hsl(${hue},70%,72%)`);ag.addColorStop(1,`hsl(${hue+30},80%,45%)`);
-                c.fillStyle=ag;c.beginPath();c.arc(x,y,r,0,Math.PI*2);c.fill();
-                c.shadowColor=`hsla(${hue},80%,65%,0.6)`;c.shadowBlur=10;
-                c.font="700 13px system-ui,sans-serif";c.fillStyle="#fff";
-                c.textAlign="center";c.fillText(name[0].toUpperCase(),x,y+5);
-                c.shadowBlur=0;c.textAlign="left";
-              };
-
-              const finish=(avatarImgs)=>{
-                const cv=buildCanvas(avatarImgs);
-                const dataUrl=cv.toDataURL("image/png");
-                const filterLabel={"all":"alltime","today":"today","week":"week","month":"month"}[timeFilter]||"alltime";
-                const d=new Date();
-                const mo=d.toLocaleString("en-US",{month:"short"}).toLowerCase();
-                const fname="tickers-"+filterLabel+"-"+mo+d.getDate()+"-"+d.getFullYear()+".png";
-
-                if(isIOS){
-                  hint.textContent="HOLD IMAGE → SAVE TO PHOTOS";
-                  spinner.style.display="none";
-                  previewImg.src=dataUrl;
-                  previewImg.style.display="block";
-                  closeBtn.style.display="block";
-                } else {
-                  // Desktop: direct download, no overlay needed
-                  const a=document.createElement("a");
-                  a.href=dataUrl;a.download=fname;a.click();
-                }
-              };
-
-              // Load avatars via fetch->blob URL so canvas drawImage never taints
-              const avatarImgs={};
-              const toLoad=ranked.filter(t=>t.pic);
-              if(toLoad.length===0){finish(avatarImgs);return;}
-              let doneCount=0;
-              const blobUrls=[];
-              const check=()=>{doneCount++;if(doneCount===toLoad.length){finish(avatarImgs);blobUrls.forEach(u=>URL.revokeObjectURL(u));}};
-              const timer=setTimeout(()=>{if(doneCount<toLoad.length)finish(avatarImgs);},4000);
-              let finished=false;
-              const origFinish=finish;
-              finish=(imgs)=>{if(finished)return;finished=true;clearTimeout(timer);origFinish(imgs);};
-              toLoad.forEach(t=>{
-                fetch(t.pic)
-                  .then(r=>r.blob())
-                  .then(blob=>{
-                    const blobUrl=URL.createObjectURL(blob);
-                    blobUrls.push(blobUrl);
-                    const img=new Image();
-                    img.onload=()=>{avatarImgs[t.id]=img;check();};
-                    img.onerror=()=>{URL.revokeObjectURL(blobUrl);check();};
-                    img.src=blobUrl;
-                  })
-                  .catch(()=>check());
-              });
-            }}>
+  toLoad.forEach(t=>{
+    fetch(t.pic,{mode:"cors"})
+      .then(r=>{if(!r.ok)throw new Error("fetch failed");return r.blob();})
+      .then(blob=>{
+        const blobUrl=URL.createObjectURL(blob);
+        blobUrls.push(blobUrl);
+        const img=new Image();
+        img.onload=()=>{avatarImgs[t.id]=img;URL.revokeObjectURL(blobUrl);checkDone();};
+        img.onerror=()=>{URL.revokeObjectURL(blobUrl);tryDirectImg(t,checkDone,avatarImgs);};
+        img.src=blobUrl;
+      })
+      .catch(()=>tryDirectImg(t,checkDone,avatarImgs));
+  });
+}}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><polyline points="7,10 12,15 17,10" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><line x1="12" y1="15" x2="12" y2="3" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinecap="round"/></svg>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:5,fontSize:10,fontFamily:MONO,letterSpacing:"0.07em",color:"rgba(52,211,153,0.9)"}}>
