@@ -1281,8 +1281,7 @@ function App() {
       const pnl   = ts.reduce((a,s)=>a+(s.pnl||0),0);
       const trades= ts.reduce((a,s)=>a+(s.trades||0),0);
       const wins  = ts.reduce((a,s)=>a+(s.wins||0),0);
-      const rrSessions = ts.filter(s=>s.rr>0);
-      const rrMade = rrSessions.length>0 ? rrSessions.reduce((a,s)=>a+(s.rr||0),0)/rrSessions.length : 0;
+      const rrMade = ts.reduce((a,s)=>a+(s.rr||0),0);
       return computeStats({...trader, pnl, trades, wins, rrMade});
     });
   },[students,sessions,timeFilter]);
@@ -1337,8 +1336,7 @@ function App() {
       const pnl    = rem.reduce((a,s)=>a+(s.pnl||0),0);
       const trades = rem.reduce((a,s)=>a+(s.trades||0),0);
       const wins   = rem.reduce((a,s)=>a+(s.wins||0),0);
-      const rrSessions = rem.filter(s=>s.rr>0);
-      const rr_made = rrSessions.length>0 ? rrSessions.reduce((a,s)=>a+(s.rr||0),0)/rrSessions.length : 0;
+      const rr_made = rem.reduce((a,s)=>a+(s.rr||0),0);
       const hide_pnl = rem.length===0 ? false : rem.some(s=>s.hide_pnl);
 
       // 3. Instantly update leaderboard UI — no waiting
@@ -1435,7 +1433,7 @@ function App() {
         trades:  cur.trades + data.trades,
         wins:    cur.wins   + data.wins,
         hide_pnl: data.hidePnl,
-        rr_made: data.rr > 0 ? ((cur.rr_made||0) * cur.trades + data.rr * data.trades) / (cur.trades + data.trades) : (cur.rr_made||0),
+        rr_made: (cur.rr_made||0) + (data.rr||0),
         updated_at: new Date().toISOString()
       }).eq('id',uid);
       /* log session */
