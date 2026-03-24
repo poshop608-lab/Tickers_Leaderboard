@@ -1268,13 +1268,12 @@ function App() {
   },[]);
 
   const filteredStudents = useMemo(()=>{
-    if(timeFilter==="all") return students;
     const now = new Date();
     const cutoff = new Date();
     if(timeFilter==="today") cutoff.setHours(0,0,0,0);
     else if(timeFilter==="week") cutoff.setDate(now.getDate()-7);
     else if(timeFilter==="month") cutoff.setDate(now.getDate()-30);
-    const filtered = sessions.filter(s=>new Date(s.submitted_at)>=cutoff);
+    const filtered = timeFilter==="all" ? sessions : sessions.filter(s=>new Date(s.submitted_at)>=cutoff);
     // Always show all traders — just show their period stats (0 if no activity)
     return students.map(trader=>{
       const ts = filtered.filter(s=>s.user_id===trader.id);
