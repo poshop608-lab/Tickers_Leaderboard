@@ -1771,7 +1771,7 @@ function App() {
                 img.crossOrigin="anonymous";
                 img.onload=()=>{avatarImgs[t.id]=img;done();};
                 img.onerror=()=>{done();};
-                img.src=t.pic+"?"+(Date.now()); // cache bust for crossOrigin
+                img.src=t.pic;
               });
             }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><polyline points="7,10 12,15 17,10" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><line x1="12" y1="15" x2="12" y2="3" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinecap="round"/></svg>
