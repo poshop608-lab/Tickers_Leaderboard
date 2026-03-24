@@ -1552,8 +1552,14 @@ function App() {
       const ry=248+i*ROW,rh=ROW-4;
       if(i%2===0){c.fillStyle="rgba(255,255,255,0.02)";roundRect(c,38,ry-2,W-76,rh,8);c.fill();}
       if(t.rank===1){const ag=c.createLinearGradient(38,ry-2,38,ry+rh);ag.addColorStop(0,"rgba(139,92,246,0.9)");ag.addColorStop(1,"rgba(99,102,241,0.4)");c.fillStyle=ag;c.fillRect(38,ry-2,3,rh);}
-      c.textAlign="left";const medals=["🏆","🥈","🥉"];
-      if(t.rank<=3){c.font="18px serif";c.fillText(medals[t.rank-1],40,ry+20);}else{c.font="700 12px 'Courier New',monospace";c.fillStyle="rgba(255,255,255,0.22)";c.fillText(String(t.rank),44,ry+20);}
+      c.textAlign="left";const medals=["🏆","🥈","🥉"];const medalColors=["rgba(196,181,253,0.9)","rgba(196,181,253,0.7)","rgba(196,181,253,0.6)"];
+      if(t.rank<=3){
+        /* Always draw the number first as reliable fallback */
+        c.font="700 11px 'Courier New',monospace";c.fillStyle=medalColors[t.rank-1];c.fillText(String(t.rank),44,ry+21);
+        /* Then draw emoji on top — if it renders it covers the number */
+        c.font="17px 'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',serif";c.fillStyle="rgba(255,255,255,1)";
+        try{c.fillText(medals[t.rank-1],38,ry+21);}catch(e){}
+      }else{c.font="700 12px 'Courier New',monospace";c.fillStyle="rgba(255,255,255,0.22)";c.fillText(String(t.rank),44,ry+20);}
       const AX=88,AY=ry+14,AR=18;const hue=[258,280,240,310,265,250,295][t.name.charCodeAt(0)%7];const img=avatarImgs[t.id];
       if(img){try{c.save();c.beginPath();c.arc(AX,AY,AR,0,Math.PI*2);c.clip();c.drawImage(img,AX-AR,AY-AR,AR*2,AR*2);c.restore();c.strokeStyle=`hsla(${hue},70%,65%,0.6)`;c.lineWidth=1.5;c.beginPath();c.arc(AX,AY,AR+1,0,Math.PI*2);c.stroke();}catch(e){drawInitial(c,AX,AY,AR,hue,t.name);}}else{drawInitial(c,AX,AY,AR,hue,t.name);}
       c.font="700 15px system-ui,sans-serif";c.fillStyle="rgba(255,255,255,0.93)";c.fillText(t.name,116,ry+20);
