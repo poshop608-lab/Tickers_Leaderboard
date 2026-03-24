@@ -1504,27 +1504,27 @@ function App() {
             <div className="dl-orb" title="Download Leaderboard PNG" onClick={()=>{
               const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
 
-              // Show overlay IMMEDIATELY on first tap — no delay
-              const overlay=document.createElement("div");
-              overlay.style.cssText="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.93);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:14px;";
-              const hint=document.createElement("div");
-              hint.style.cssText="font-family:'SF Mono',monospace;font-size:12px;font-weight:700;color:rgba(196,181,253,0.85);letter-spacing:0.1em;text-align:center;";
-              hint.textContent="GENERATING...";
-              const spinner=document.createElement("div");
-              spinner.style.cssText="width:28px;height:28px;border:2px solid rgba(139,92,246,0.2);border-top:2px solid rgba(196,181,253,0.8);border-radius:50%;animation:spin 0.7s linear infinite;";
-              const previewImg=document.createElement("img");
-              previewImg.style.cssText="max-width:100%;max-height:70vh;border-radius:12px;box-shadow:0 0 50px rgba(139,92,246,0.25);display:none;";
-              const closeBtn=document.createElement("button");
-              closeBtn.textContent="✕  CLOSE";
-              closeBtn.style.cssText="padding:10px 28px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.3);border-radius:99px;color:rgba(196,181,253,0.9);font-family:'SF Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;cursor:pointer;display:none;";
-              closeBtn.onclick=()=>document.body.removeChild(overlay);
-              overlay.onclick=(e)=>{if(e.target===overlay)document.body.removeChild(overlay);};
-              overlay.appendChild(hint);
-              overlay.appendChild(spinner);
-              overlay.appendChild(previewImg);
-              overlay.appendChild(closeBtn);
-              // Always show overlay — on desktop it disappears after download, on iOS user saves from it
-              document.body.appendChild(overlay);
+              // iOS: show overlay immediately on tap for instant feedback
+              // Desktop: no overlay needed — direct download
+              let overlay=null,hint=null,spinner=null,previewImg=null,closeBtn=null;
+              if(isIOS){
+                overlay=document.createElement("div");
+                overlay.style.cssText="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.93);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:14px;";
+                hint=document.createElement("div");
+                hint.style.cssText="font-family:'SF Mono',monospace;font-size:12px;font-weight:700;color:rgba(196,181,253,0.85);letter-spacing:0.1em;text-align:center;";
+                hint.textContent="GENERATING...";
+                spinner=document.createElement("div");
+                spinner.style.cssText="width:28px;height:28px;border:2px solid rgba(139,92,246,0.2);border-top:2px solid rgba(196,181,253,0.8);border-radius:50%;animation:spin 0.7s linear infinite;";
+                previewImg=document.createElement("img");
+                previewImg.style.cssText="max-width:100%;max-height:70vh;border-radius:12px;box-shadow:0 0 50px rgba(139,92,246,0.25);display:none;";
+                closeBtn=document.createElement("button");
+                closeBtn.textContent="✕  CLOSE";
+                closeBtn.style.cssText="padding:10px 28px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.3);border-radius:99px;color:rgba(196,181,253,0.9);font-family:'SF Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;cursor:pointer;display:none;";
+                closeBtn.onclick=()=>document.body.removeChild(overlay);
+                overlay.onclick=(e)=>{if(e.target===overlay)document.body.removeChild(overlay);};
+                overlay.appendChild(hint);overlay.appendChild(spinner);overlay.appendChild(previewImg);overlay.appendChild(closeBtn);
+                document.body.appendChild(overlay);
+              }
 
               const buildCanvas=(avatarImgs)=>{
                 const W=1200,ROW=62,H=Math.max(720,280+ranked.length*ROW+60);
@@ -1678,29 +1678,35 @@ function App() {
                   previewImg.style.display="block";
                   closeBtn.style.display="block";
                 } else {
-                  document.body.removeChild(overlay);
+                  // Desktop: direct download, no overlay needed
                   const a=document.createElement("a");
                   a.href=dataUrl;a.download=fname;a.click();
                 }
               };
 
-              // Load avatars — no crossOrigin, just fetch as blob via proxy
+              // Load avatars via fetch->blob URL so canvas drawImage never taints
               const avatarImgs={};
               const toLoad=ranked.filter(t=>t.pic);
               if(toLoad.length===0){finish(avatarImgs);return;}
-              let done=0;
-              const check=()=>{done++;if(done===toLoad.length)finish(avatarImgs);};
-              const TIMEOUT=3000;
-              const timer=setTimeout(()=>finish(avatarImgs),TIMEOUT);
-              let completed=false;
+              let doneCount=0;
+              const blobUrls=[];
+              const check=()=>{doneCount++;if(doneCount===toLoad.length){finish(avatarImgs);blobUrls.forEach(u=>URL.revokeObjectURL(u));}};
+              const timer=setTimeout(()=>{if(doneCount<toLoad.length)finish(avatarImgs);},4000);
+              let finished=false;
               const origFinish=finish;
-              const safeFinish=(imgs)=>{if(completed)return;completed=true;clearTimeout(timer);origFinish(imgs);};
+              finish=(imgs)=>{if(finished)return;finished=true;clearTimeout(timer);origFinish(imgs);};
               toLoad.forEach(t=>{
-                const img=new Image();
-                // No crossOrigin — let browser load naturally, canvas taint handled by try/catch
-                img.onload=()=>{avatarImgs[t.id]=img;check();};
-                img.onerror=()=>{check();};
-                img.src=t.pic;
+                fetch(t.pic)
+                  .then(r=>r.blob())
+                  .then(blob=>{
+                    const blobUrl=URL.createObjectURL(blob);
+                    blobUrls.push(blobUrl);
+                    const img=new Image();
+                    img.onload=()=>{avatarImgs[t.id]=img;check();};
+                    img.onerror=()=>{URL.revokeObjectURL(blobUrl);check();};
+                    img.src=blobUrl;
+                  })
+                  .catch(()=>check());
               });
             }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><polyline points="7,10 12,15 17,10" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><line x1="12" y1="15" x2="12" y2="3" stroke="rgba(196,181,253,0.9)" strokeWidth="2" strokeLinecap="round"/></svg>
