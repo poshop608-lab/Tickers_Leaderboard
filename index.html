@@ -1384,7 +1384,23 @@ function App() {
   const filteredStudents = useMemo(()=>{
     const now = new Date();
     const cutoff = new Date();
-    if(timeFilter==="today") cutoff.setHours(0,0,0,0);
+    if(timeFilter==="today") {
+      // Reset at 4:00 PM New York time (America/New_York) — matches market close
+      const nyNow = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
+      const nyHour = nyNow.getHours();
+      const nyMinute = nyNow.getMinutes();
+      // If it's before 4pm NY, today's window started at 4pm YESTERDAY NY time
+      // If it's 4pm or later NY, today's window started at 4pm TODAY NY time
+      const nyReset = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
+      nyReset.setSeconds(0, 0);
+      if (nyHour < 16 || (nyHour === 16 && nyMinute === 0 && nyReset.getSeconds() === 0)) {
+        nyReset.setDate(nyReset.getDate() - 1);
+      }
+      nyReset.setHours(16, 0, 0, 0);
+      // Convert back to UTC for comparison
+      const tzOffset = now.getTime() - new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" })).getTime();
+      cutoff.setTime(nyReset.getTime() + tzOffset);
+    }
     else if(timeFilter==="week") cutoff.setDate(now.getDate()-7);
     else if(timeFilter==="month") cutoff.setDate(now.getDate()-30);
     const filtered = timeFilter==="all" ? sessions : sessions.filter(s=>new Date(s.submitted_at)>=cutoff);
