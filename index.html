@@ -1127,8 +1127,9 @@ function AdminPanel({ students, sessions, onDeleteSession, onDeleteTrader }) {
   const rejectUser = async (profile) => {
     setApprovingId(profile.id);
     try {
-      await SUPA.from('profiles').delete().eq('id',profile.id);
-      setPending(p=>p.filter(x=>x.id!==profile.id));
+      const { error } = await SUPA.from('profiles').update({status:'rejected'}).eq('id',profile.id);
+      if (error) console.error('Reject error:', error);
+      else setPending(p=>p.filter(x=>x.id!==profile.id));
     } catch(e) { console.error(e); }
     setApprovingId(null);
   };
